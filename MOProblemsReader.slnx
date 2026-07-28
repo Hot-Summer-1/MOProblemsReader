@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="MOProblemsReader/MOProblemsReader.csproj" />
+  <Project Path="ProblemViewer/ProblemViewer.csproj" Id="2071bf6f-f8a8-4d5c-bddb-254d67fa3180" />
+</Solution>

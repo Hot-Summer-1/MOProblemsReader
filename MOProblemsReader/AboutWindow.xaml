@@ -1,0 +1,52 @@
+<Window x:Class="MOProblemsReader.AboutWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="关于 数学竞赛问题集" 
+        Height="280" Width="420"
+        ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False">
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- 应用名称 -->
+        <TextBlock Grid.Row="0" 
+                   Text="数学竞赛问题集" 
+                   FontSize="22" FontWeight="Bold"
+                   HorizontalAlignment="Center" Margin="0,10,0,5"/>
+
+        <!-- 版本号（由代码动态设置） -->
+        <TextBlock Grid.Row="1" 
+                   x:Name="VersionTextBlock"
+                   Text=""
+                   FontSize="13"
+                   HorizontalAlignment="Center" Margin="0,0,0,10"/>
+
+        <!-- 描述文字 -->
+        <TextBlock Grid.Row="2" 
+                   Text="一个用于浏览和阅读数学竞赛试题的桌面工具。"
+                   FontSize="13"
+                   TextWrapping="Wrap" TextAlignment="Center"
+                   Margin="10,0,10,10"/>
+
+        <!-- 版权信息 -->
+        <TextBlock Grid.Row="3" 
+                   x:Name="CopyrightTextBlock"
+                   Text=""
+                   FontSize="12" 
+                   HorizontalAlignment="Center" Margin="0,5"/>
+
+        <!-- 确定按钮 -->
+        <Button Grid.Row="4" 
+                Content="确定" 
+                Width="80" Height="28"
+                HorizontalAlignment="Center" VerticalAlignment="Bottom"
+                Click="OkButton_Click"/>
+    </Grid>
+</Window>

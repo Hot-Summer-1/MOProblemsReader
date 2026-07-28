@@ -1,0 +1,30 @@
+<Window x:Class="MOProblemsReader.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:MOProblemsReader"
+        mc:Ignorable="d"
+        Title="数学竞赛问题集" Height="450" Width="800">
+     <DockPanel>
+         <!-- 顶部菜单栏 -->
+         <Menu DockPanel.Dock="Top">
+            <MenuItem Header="文件(_F)" >
+                <MenuItem Header="更新(_U)" InputGestureText="Ctrl+U" Click="UpdateMenuItem_Click"/>
+                <MenuItem Header="题源...(_S)" Click="SourceMenuItem_Click"/>
+                <Separator/>
+                <MenuItem Header="退出(_X)" InputGestureText="Alt+F4" Click="ExitMenuItem_Click"/>
+            </MenuItem>
+            <MenuItem Header="关于(_A)" >
+                <MenuItem Header="关于数学竞赛问题集(_A)" Click="AboutMenuItem_Click"/>
+            </MenuItem>
+        </Menu>
+
+         <!-- 主体内容区域 -->
+         <Grid>
+            <TreeView Name="ProblemTreeView">
+                
+            </TreeView>
+         </Grid>
+     </DockPanel>
+</Window>
