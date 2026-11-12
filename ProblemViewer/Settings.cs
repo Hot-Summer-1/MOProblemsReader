@@ -30,8 +30,8 @@ namespace ProblemViewer
             set
             {
                 _forceupdaterequired = value;
-                
-
+                using RegistryKey key = Registry.CurrentUser.CreateSubKey(RegKeyPath, true);
+                key.SetValue("ForceUpdateRequired", _forceupdaterequired ? 1 : 0, RegistryValueKind.DWord);
             }
         }
         public static string RepositoryURL
@@ -49,7 +49,6 @@ namespace ProblemViewer
             set
             {
                 _autoUpdate = value;
-
             }
         }
 
@@ -86,7 +85,7 @@ namespace ProblemViewer
             using RegistryKey key = Registry.CurrentUser.CreateSubKey(RegKeyPath, true);
             key.SetValue("RepositoryURL", _repositoryURL, RegistryValueKind.String);
             key.SetValue("AutoUpdate", _autoUpdate ? 1 : 0, RegistryValueKind.DWord);
-            key.SetValue("ForceUpdateRequired", _forceupdaterequired ? 1 : 0, RegistryValueKind.DWord);
+            //key.SetValue("ForceUpdateRequired", _forceupdaterequired ? 1 : 0, RegistryValueKind.DWord);
             key.Close();
 
         }

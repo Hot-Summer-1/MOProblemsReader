@@ -4,11 +4,35 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:MOProblemsReader"
+        xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
         mc:Ignorable="d"
         Title="数学竞赛问题集" Height="450" Width="800">
-     <DockPanel>
-         <!-- 顶部菜单栏 -->
-         <Menu DockPanel.Dock="Top">
+    <Window.Resources>
+        <!--
+            加载中占位模板：用原生 ProgressBar 套 MaterialDesign 的环形样式（MaterialDesignCircularProgressBar）。
+            不要写成 materialDesign:CircularProgressBar —— 该标记在 MaterialDesignThemes 5.2.1 的 XAML 命名空间
+            中并未导出，会报 MC3074 编译错误。
+            样式键用 DynamicResource：键缺失时只退化为默认外观，不会像 StaticResource 那样在运行时抛异常。
+            前景色绑定应用资源 SystemAccentBrush：它由 App 启动时从注册表 HKCU\...\DWM\AccentColor 读取，
+            并在系统改强调色或切换浅色/深色时运行时刷新。系统强调色只存在于注册表，
+            不能用 SystemColors.HighlightBrushKey —— 那是固定值（#FF0078D7），不跟随用户强调色。
+            Header 必须是非 null 值（占位项的 Header="Loading"），否则 ContentPresenter 不会套用本模板。
+        -->
+        <DataTemplate x:Key="LoadingIndicatorTemplate">
+            <!-- 负 Margin 抵消 TreeViewItem 子项自带的层级缩进，让转圈靠左贴近父节点文字 -->
+            <ProgressBar IsIndeterminate="True"
+                         Style="{DynamicResource MaterialDesignCircularProgressBar}"
+                         Width="18"
+                         Height="18"
+                         Margin="-16,0,0,0"
+                         HorizontalAlignment="Left"
+                         Foreground="{DynamicResource SystemAccentBrush}" />
+        </DataTemplate>
+    </Window.Resources>
+
+    <DockPanel>
+        <!-- 顶部菜单栏 -->
+        <Menu DockPanel.Dock="Top">
             <MenuItem Header="文件(_F)" >
                 <MenuItem Header="更新(_U)" InputGestureText="Ctrl+U" Click="UpdateMenuItem_Click"/>
                 <MenuItem Header="题源...(_S)" Click="SourceMenuItem_Click"/>
@@ -20,11 +44,40 @@
             </MenuItem>
         </Menu>
 
-         <!-- 主体内容区域 -->
-         <Grid>
-            <TreeView Name="ProblemTreeView">
-                
+        <!-- 主体内容区域 -->
+        <Grid>
+            <!-- Expanded 是冒泡路由事件，在 TreeView 上挂接一次即可覆盖所有层级的节点 -->
+            <TreeView Name="ProblemTreeView" TreeViewItem.Expanded="ProblemTreeView_ItemExpanded">
+                <TreeViewItem Header="国内" Name="ChinaCompetitionsTree">
+                    <!-- 占位子项：使节点在折叠态就渲染展开箭头，展开后显示转圈，由代码按 Tag 回收 -->
+                    <TreeViewItem Header="Loading"
+                                  HeaderTemplate="{StaticResource LoadingIndicatorTemplate}"
+                                  Tag="LoadingPlaceholder"
+                                  IsHitTestVisible="False"
+                                  Focusable="False" />
+                </TreeViewItem>
+                <TreeViewItem Header="国外" Name="AbroadCompetitionsTree">
+                    <TreeViewItem Header="Loading"
+                                  HeaderTemplate="{StaticResource LoadingIndicatorTemplate}"
+                                  Tag="LoadingPlaceholder"
+                                  IsHitTestVisible="False"
+                                  Focusable="False" />
+                </TreeViewItem>
+                <TreeViewItem Header="大学" Name="UniversityCompetitionsTree">
+                    <TreeViewItem Header="Loading"
+                                  HeaderTemplate="{StaticResource LoadingIndicatorTemplate}"
+                                  Tag="LoadingPlaceholder"
+                                  IsHitTestVisible="False"
+                                  Focusable="False" />
+                </TreeViewItem>
+                <TreeViewItem Header="原创" Name="OriginalCompetitionsTree">
+                    <TreeViewItem Header="Loading"
+                                  HeaderTemplate="{StaticResource LoadingIndicatorTemplate}"
+                                  Tag="LoadingPlaceholder"
+                                  IsHitTestVisible="False"
+                                  Focusable="False" />
+                </TreeViewItem>
             </TreeView>
-         </Grid>
-     </DockPanel>
+        </Grid>
+    </DockPanel>
 </Window>

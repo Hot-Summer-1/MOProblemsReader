@@ -4,21 +4,68 @@ using System.Diagnostics;
 using System.IO;
 using System.Text;
 using System.Windows;
+using System.Windows.Documents;
 
 namespace ProblemViewer
 {
     public static class RepositoryManager
-    {
-        public static void UpdateRepository()
-        {
 
-            if (Settings.ForceUpdateRequired) {
-                var p = Process.Start("cmd.exe","/c rd /s /q " + Settings.LocalRepositoryPath);
-                p.WaitForExit();
-            }
+    {
+        public static bool Working { get; private set; } = false;
+
+        public static void UpdateRepository(Window? parentwindow=null)
+        {
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                var updateWindow = new UpdateWindow
+                {
+                    Owner = parentwindow 
+                };
+                updateWindow.Show();
+            });
             
+        }
+        public static void UpdateRepositoryWorker()
+        {
+            Working = true;
+            if (Settings.ForceUpdateRequired)
+            {
+                /*var startInfo = new ProcessStartInfo
+                {
+                    FileName = "cmd.exe",
+                    Arguments = "/c rd /s /q " + Settings.LocalRepositoryPath,
+                    WindowStyle = ProcessWindowStyle.Hidden
+                };
+
+                var p = Process.Start(startInfo);
+                p.WaitForExit();*/
+                try
+                {
+                    foreach (string file in Directory.EnumerateFileSystemEntries(Settings.LocalRepositoryPath, "*",
+                                 SearchOption.AllDirectories))
+                    {
+                        File.SetAttributes(file, FileAttributes.Normal);
+                    }
+
+                    Directory.Delete(Settings.LocalRepositoryPath, true);
+                }
+                catch (DirectoryNotFoundException)
+                {
+                    //Do nothing
+                }
+                catch (Exception ex)
+                {
+                    Application.Current.Dispatcher.Invoke(()=>MessageBox.Show(Application.Current.MainWindow!,$"Error deleting existed repository:{ex.Message}"));
+                    Working = false;
+                    return;
+                    //TODO
+                }
+
+
+            }
+            Settings.ForceUpdateRequired = true;
             // Check if the local repository exists
-            if (!System.IO.Directory.Exists(Settings.LocalRepositoryPath))
+            if (!System.IO.Directory.Exists(Path.Combine(Settings.LocalRepositoryPath, ".git")))
             {
                 // Clone the repository if it doesn't exist
                 CloneRepository();
@@ -29,7 +76,7 @@ namespace ProblemViewer
                 PullRepository();
             }
             Settings.ForceUpdateRequired = false;
-            Settings.SaveSettings();
+            Working = false;
         }
         private static void CloneRepository()
         {
@@ -41,7 +88,8 @@ namespace ProblemViewer
             catch (Exception ex)
             {
                 // Handle exceptions (e.g., network issues, invalid URL)
-                MessageBox.Show($"Error cloning repository: {ex.Message}");
+                Application.Current.Dispatcher.Invoke(()=>MessageBox.Show(Application.Current.MainWindow!,$"Error cloning repository: {ex.Message}"));
+                Working = false;
                 //TODO
             }
         }
@@ -49,19 +97,19 @@ namespace ProblemViewer
         {
             try
             {
-                using (var repo = new LibGit2Sharp.Repository(Settings.LocalRepositoryPath))
-                {
-                    var remote = repo.Network.Remotes["origin"];
-                    var refSpecs = remote.FetchRefSpecs.Select(x => x.Specification);
-                    LibGit2Sharp.Commands.Fetch(repo, remote.Name, refSpecs, null, null);
-                    var mergeResult = repo.MergeFetchedRefs(
-                        new LibGit2Sharp.Signature("AutoUpdater", "auto.updater@example.com", DateTimeOffset.Now),
-                        null);
-                }
+                using var repo = new LibGit2Sharp.Repository(Settings.LocalRepositoryPath);
+                var remote = repo.Network.Remotes["origin"];
+                var refSpecs = remote.FetchRefSpecs.Select(x => x.Specification);
+                LibGit2Sharp.Commands.Fetch(repo, remote.Name, refSpecs, null, null);
+                var mergeResult = repo.MergeFetchedRefs(
+                    new LibGit2Sharp.Signature("AutoUpdater", "auto.updater@example.com", DateTimeOffset.Now),
+                    null);
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error pulling repository: {ex.Message}");
+
+                Application.Current.Dispatcher.Invoke(() => MessageBox.Show(Application.Current.MainWindow!,$"Error pulling repository: {ex.Message}"));
+                Working = false;
                 //TODO
             }
         }
