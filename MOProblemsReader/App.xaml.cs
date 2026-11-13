@@ -31,6 +31,8 @@ namespace MOProblemsReader
         private void Application_Exit(object sender, ExitEventArgs e)
         {
             // SystemEvents 是静态事件，会持有 App 的强引用，不退订会导致应用对象无法回收
+            SystemEvents.UserPreferenceChanged -= OnUserPreferenceChanged;
+            Settings.SaveSettings();
         }
 
         private void App_DispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
