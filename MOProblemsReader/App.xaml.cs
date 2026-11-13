@@ -1,7 +1,10 @@
-﻿using System.Windows;
-using System.Windows.Media;
-using Microsoft.Win32;
+﻿using Microsoft.Win32;
 using ProblemViewer;
+using System.Globalization;
+using System.Text;
+using System.Windows;
+using System.Windows.Media;
+using System.Windows.Threading;
 
 namespace MOProblemsReader
 {
@@ -28,17 +31,24 @@ namespace MOProblemsReader
         private void Application_Exit(object sender, ExitEventArgs e)
         {
             // SystemEvents 是静态事件，会持有 App 的强引用，不退订会导致应用对象无法回收
-            SystemEvents.UserPreferenceChanged -= OnUserPreferenceChanged;
-            Settings.SaveSettings();
+        }
+
+        private void App_DispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
+        {
+            MessageBox.Show($"应用程序遇到错误: {e.Exception.Message}", "应用程序错误", MessageBoxButton.OK, MessageBoxImage.Error);
+            e.Handled = true;
+            Environment.Exit(1);
         }
 
         private void Application_Startup(object sender, StartupEventArgs e)
         {
+            DispatcherUnhandledException += App_DispatcherUnhandledException;
             InitializeAccentBrush();
 
             Settings.LoadSettings();
             if (Settings.ForceUpdateRequired)
             {
+                ShutdownMode = ShutdownMode.OnExplicitShutdown;
                 RepositoryManager.UpdateRepository();
             }
         }

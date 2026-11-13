@@ -5,9 +5,17 @@ using System.IO;
 using System.Text;
 using System.Windows;
 using System.Windows.Documents;
+using Windows.Security.Authentication.Web.Provider;
 
 namespace ProblemViewer
 {
+    public class RepositoryUpdateException : Exception
+    {
+        public RepositoryUpdateException(string? message=null,Exception? innerException=null): base(message,innerException)
+        {
+
+        }
+    }
     public static class RepositoryManager
 
     {
@@ -21,7 +29,7 @@ namespace ProblemViewer
                 {
                     Owner = parentwindow 
                 };
-                updateWindow.Show();
+                updateWindow.ShowDialog();
             });
             
         }
@@ -55,48 +63,56 @@ namespace ProblemViewer
                 }
                 catch (Exception ex)
                 {
-                    Application.Current.Dispatcher.Invoke(()=>MessageBox.Show(Application.Current.MainWindow!,$"Error deleting existed repository:{ex.Message}"));
                     Working = false;
-                    return;
-                    //TODO
+                    throw new RepositoryUpdateException($"Error deleting existed files: {ex.Message}", ex);
                 }
-
 
             }
             Settings.ForceUpdateRequired = true;
-            // Check if the local repository exists
-            if (!System.IO.Directory.Exists(Path.Combine(Settings.LocalRepositoryPath, ".git")))
-            {
-                // Clone the repository if it doesn't exist
-                CloneRepository();
+            
+                // Check if the local repository exists
+                if (!System.IO.Directory.Exists(Path.Combine(Settings.LocalRepositoryPath, ".git")))
+                {
+                    // Clone the repository if it doesn't exist
+                    try
+                    {
+                        CloneRepository();
+                    }
+                    catch (Exception ex)
+                    {
+                        Working = false;
+                        throw new RepositoryUpdateException($"Error cloning repository: {ex.Message}", ex);
+                    }
             }
-            else
-            {
-                // Pull the latest changes if it exists
-                PullRepository();
-            }
+                else
+                {
+                    // Pull the latest changes if it exists
+                    try
+                    {
+                        PullRepository();
+                    }
+                    catch (Exception ex)
+                    {
+                        Working = false;
+                        throw new RepositoryUpdateException($"Error updating existed repository: {ex.Message}", ex);
+                    }
+                }
+            
+
             Settings.ForceUpdateRequired = false;
             Working = false;
         }
         private static void CloneRepository()
         {
             // Use LibGit2Sharp to clone the repository
-            try
-            {
+            
+            
                 LibGit2Sharp.Repository.Clone(Settings.RepositoryURL, Settings.LocalRepositoryPath);
-            }
-            catch (Exception ex)
-            {
-                // Handle exceptions (e.g., network issues, invalid URL)
-                Application.Current.Dispatcher.Invoke(()=>MessageBox.Show(Application.Current.MainWindow!,$"Error cloning repository: {ex.Message}"));
-                Working = false;
-                //TODO
-            }
         }
         private static void PullRepository()
         {
-            try
-            {
+            
+            
                 using var repo = new LibGit2Sharp.Repository(Settings.LocalRepositoryPath);
                 var remote = repo.Network.Remotes["origin"];
                 var refSpecs = remote.FetchRefSpecs.Select(x => x.Specification);
@@ -104,14 +120,8 @@ namespace ProblemViewer
                 var mergeResult = repo.MergeFetchedRefs(
                     new LibGit2Sharp.Signature("AutoUpdater", "auto.updater@example.com", DateTimeOffset.Now),
                     null);
-            }
-            catch (Exception ex)
-            {
-
-                Application.Current.Dispatcher.Invoke(() => MessageBox.Show(Application.Current.MainWindow!,$"Error pulling repository: {ex.Message}"));
-                Working = false;
-                //TODO
-            }
+            
+            
         }
     }
 }

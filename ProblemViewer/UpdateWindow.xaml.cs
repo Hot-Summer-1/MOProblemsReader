@@ -35,10 +35,15 @@ namespace ProblemViewer
 
         private async void Window_Loaded(object sender, RoutedEventArgs e)
         {
-            await Task.Run(() =>
+            try
             {
-                RepositoryManager.UpdateRepositoryWorker();
-            });
+                await Task.Run(() => { RepositoryManager.UpdateRepositoryWorker(); });
+            }
+            catch (RepositoryUpdateException ex)
+            {
+                MessageBox.Show(this,ex.Message, "存储库更新失败", MessageBoxButton.OK, MessageBoxImage.Error);
+                Close();
+            }
             Close();
         }
     }

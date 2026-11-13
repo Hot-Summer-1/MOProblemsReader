@@ -34,6 +34,7 @@ namespace MOProblemsReader
 
         public MainWindow()
         {
+            Application.Current.ShutdownMode = ShutdownMode.OnLastWindowClose;
             InitializeComponent();
         }
 
@@ -93,29 +94,40 @@ namespace MOProblemsReader
                 return;
             }
             var nodeName = node.Name;
-            var item=await Task.Run(()=>LoadChildrenAsync(nodeName));
-            RemoveLoadingPlaceholder(node);
-            var nodeitemlist = new List<TreeViewItem>();
-            foreach (CompetitionInfo comp in item)
+            try
             {
-                var comptreeviewitem = new TreeViewItem
+                var item = await Task.Run(() => LoadChildrenAsync(nodeName));
+                RemoveLoadingPlaceholder(node);
+                var nodeitemlist = new List<TreeViewItem>();
+                foreach (CompetitionInfo comp in item)
                 {
-                    Name = comp.name,
-                    Header = comp.display_name
-                };
-                var yearlist = new List<TreeViewItem>();
-                foreach (YearInfo year in comp.years)
-                {
-                    var yeartreeviewitem = new TreeViewItem
+                    var comptreeviewitem = new TreeViewItem
                     {
-                        Header = year.name
+                        Name = comp.name,
+                        Header = comp.display_name
                     };
-                    yearlist.Add(yeartreeviewitem);
+                    var yearlist = new List<TreeViewItem>();
+                    foreach (YearInfo year in comp.years)
+                    {
+                        var yeartreeviewitem = new TreeViewItem
+                        {
+                            Header = year.name
+                        };
+                        yearlist.Add(yeartreeviewitem);
+                    }
+                    comptreeviewitem.ItemsSource = yearlist;
+                    nodeitemlist.Add(comptreeviewitem);
                 }
-                comptreeviewitem.ItemsSource=yearlist;
-                nodeitemlist.Add(comptreeviewitem);
+                node.ItemsSource = nodeitemlist;
             }
-            node.ItemsSource=nodeitemlist;
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, $"加载竞赛条目时遇到错误: {ex.Message}", "竞赛条目加载错误", MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+                node.IsExpanded = false;
+                node.IsEnabled = false;
+            }
+            
         }
 
         /// <summary>
@@ -143,7 +155,7 @@ namespace MOProblemsReader
             {
                 string name = new DirectoryInfo(dir).Name, infofile = Path.Combine(dir, "info.json");
                 string jsonInfoString = File.ReadAllText(infofile);
-                CompetitionInfo compinfo = JsonSerializer.Deserialize<CompetitionInfo>(jsonInfoString);
+                CompetitionInfo compinfo = JsonSerializer.Deserialize<CompetitionInfo>(jsonInfoString)!;
                 compinfo.name = name;
                 compInfoItems.Add(compinfo);
             }
