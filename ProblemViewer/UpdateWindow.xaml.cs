@@ -20,17 +20,26 @@ namespace ProblemViewer
         public UpdateWindow()
         {
             InitializeComponent();
-            var UpdateThread = new System.Threading.Thread(() =>
+            /*var UpdateThread = new Thread(() =>
             {
                 RepositoryManager.UpdateRepositoryWorker();
                 Dispatcher.Invoke(() => Close());
             });
-            UpdateThread.Start();
+            UpdateThread.Start();*/
         }
 
         private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
             if (RepositoryManager.Working) e.Cancel = true;
+        }
+
+        private async void Window_Loaded(object sender, RoutedEventArgs e)
+        {
+            await Task.Run(() =>
+            {
+                RepositoryManager.UpdateRepositoryWorker();
+            });
+            Close();
         }
     }
 }

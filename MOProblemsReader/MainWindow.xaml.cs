@@ -1,6 +1,8 @@
-﻿using System.Text;
+﻿using System.IO;
+using System.Text;
 using System.Windows;
 using System.Windows.Controls;
+using System.Text.Json;
 using System.Windows.Data;
 using System.Windows.Documents;
 using System.Windows.Input;
@@ -8,7 +10,10 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
+using LibGit2Sharp;
 using ProblemViewer;
+using Path = System.IO.Path;
+
 namespace MOProblemsReader
 {
     
@@ -51,7 +56,7 @@ namespace MOProblemsReader
 
         private void UpdateMenuItem_Click(object sender, RoutedEventArgs e)
         {
-            RepositoryManager.UpdateRepository();
+            RepositoryManager.UpdateRepository(this);
         }
 
         private void SourceMenuItem_Click(object sender, RoutedEventArgs e)
@@ -68,7 +73,7 @@ namespace MOProblemsReader
         /// </summary>
         /// <param name="sender">事件源。由于挂接在 TreeView 上，此处通常是 TreeView 而非被展开的节点。</param>
         /// <param name="e">路由事件参数，其中 OriginalSource 才是真正被展开的 TreeViewItem。</param>
-        private void ProblemTreeView_ItemExpanded(object sender, RoutedEventArgs e)
+        private async void ProblemTreeView_ItemExpanded(object sender, RoutedEventArgs e)
         {
             // Expanded 是冒泡路由事件：任意深度节点展开都会冒泡到 TreeView，
             // 因此必须用 OriginalSource 定位真正展开的节点，不能直接强转 sender。
@@ -77,26 +82,72 @@ namespace MOProblemsReader
                 return;
             }
 
+            if (ItemsControl.ItemsControlFromItemContainer(node) is not TreeView)
+            {
+                return;
+            }
             // 只有仍处于「占位状态」的节点才需要走首次加载；
             // 已填充真实数据的节点再次展开时不应重复请求，避免反复加载。
             if (!HasLoadingPlaceholder(node))
             {
                 return;
             }
-
-            //RemoveLoadingPlaceholder(node);
-            //LoadChildrenAsync(node);
+            var nodeName = node.Name;
+            var item=await Task.Run(()=>LoadChildrenAsync(nodeName));
+            RemoveLoadingPlaceholder(node);
+            var nodeitemlist = new List<TreeViewItem>();
+            foreach (CompetitionInfo comp in item)
+            {
+                var comptreeviewitem = new TreeViewItem
+                {
+                    Name = comp.name,
+                    Header = comp.display_name
+                };
+                var yearlist = new List<TreeViewItem>();
+                foreach (YearInfo year in comp.years)
+                {
+                    var yeartreeviewitem = new TreeViewItem
+                    {
+                        Header = year.name
+                    };
+                    yearlist.Add(yeartreeviewitem);
+                }
+                comptreeviewitem.ItemsSource=yearlist;
+                nodeitemlist.Add(comptreeviewitem);
+            }
+            node.ItemsSource=nodeitemlist;
         }
 
         /// <summary>
         /// 加载指定节点的子节点。当前仅搭建 UI 架子，尚未接入真实题库数据。
         /// </summary>
         /// <param name="node">需要加载子节点的树节点（国内 / 国外 / 大学 / 原创 之一）。</param>
-        private void LoadChildrenAsync(TreeViewItem node)
+        private List<CompetitionInfo> LoadChildrenAsync(string nodeName)
         {
             // TODO: 接入真实数据时在此按 node 异步拉取题目集合并逐个添加为子节点。
-            //       若拉取耗时可见，可在开始时调用 BeginLoading(node)、结束时调用 EndLoading(node)
-            //       以便让转圈重新出现；若结果为空，需注意不要留下空白缩进行。
+            string CompetitonPath = Path.Combine(Settings.LocalRepositoryPath,"problems");
+            switch (nodeName)
+            {
+                case "china":
+                case "abroad":
+                case "university":
+                case "original": 
+                    CompetitonPath = Path.Combine(CompetitonPath, nodeName);
+                    break;
+                default:
+                    throw new ArgumentException($"Invalid node name:{nodeName}.");
+            }
+
+            var compInfoItems = new List<CompetitionInfo>();
+            foreach (string dir in Directory.EnumerateDirectories(CompetitonPath))
+            {
+                string name = new DirectoryInfo(dir).Name, infofile = Path.Combine(dir, "info.json");
+                string jsonInfoString = File.ReadAllText(infofile);
+                CompetitionInfo compinfo = JsonSerializer.Deserialize<CompetitionInfo>(jsonInfoString);
+                compinfo.name = name;
+                compInfoItems.Add(compinfo);
+            }
+            return compInfoItems;
         }
 
         /// <summary>

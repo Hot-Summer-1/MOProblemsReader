@@ -31,10 +31,13 @@ namespace MOProblemsReader
         {
             if (RepositoryURLTextBox.Text != Settings.RepositoryURL)
             {
-                Settings.RepositoryURL = RepositoryURLTextBox.Text;
-                Settings.ForceUpdateRequired = true;
+                if (MessageBox.Show("是否保存对题源URL的更改？", "提示", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+                    Settings.RepositoryURL = RepositoryURLTextBox.Text;
+                    Settings.ForceUpdateRequired = true;
+                    Settings.SaveSettings();
+                
             }
-            RepositoryManager.UpdateRepository();
+            RepositoryManager.UpdateRepository(Application.Current.MainWindow);
 
         }
         private void ApplySettings()

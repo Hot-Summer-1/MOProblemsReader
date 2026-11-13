@@ -48,7 +48,7 @@
         <Grid>
             <!-- Expanded 是冒泡路由事件，在 TreeView 上挂接一次即可覆盖所有层级的节点 -->
             <TreeView Name="ProblemTreeView" TreeViewItem.Expanded="ProblemTreeView_ItemExpanded">
-                <TreeViewItem Header="国内" Name="ChinaCompetitionsTree">
+                <TreeViewItem Header="国内" Name="china">
                     <!-- 占位子项：使节点在折叠态就渲染展开箭头，展开后显示转圈，由代码按 Tag 回收 -->
                     <TreeViewItem Header="Loading"
                                   HeaderTemplate="{StaticResource LoadingIndicatorTemplate}"
@@ -56,21 +56,21 @@
                                   IsHitTestVisible="False"
                                   Focusable="False" />
                 </TreeViewItem>
-                <TreeViewItem Header="国外" Name="AbroadCompetitionsTree">
+                <TreeViewItem Header="国外" Name="abroad">
                     <TreeViewItem Header="Loading"
                                   HeaderTemplate="{StaticResource LoadingIndicatorTemplate}"
                                   Tag="LoadingPlaceholder"
                                   IsHitTestVisible="False"
                                   Focusable="False" />
                 </TreeViewItem>
-                <TreeViewItem Header="大学" Name="UniversityCompetitionsTree">
+                <TreeViewItem Header="大学" Name="university">
                     <TreeViewItem Header="Loading"
                                   HeaderTemplate="{StaticResource LoadingIndicatorTemplate}"
                                   Tag="LoadingPlaceholder"
                                   IsHitTestVisible="False"
                                   Focusable="False" />
                 </TreeViewItem>
-                <TreeViewItem Header="原创" Name="OriginalCompetitionsTree">
+                <TreeViewItem Header="原创" Name="original">
                     <TreeViewItem Header="Loading"
                                   HeaderTemplate="{StaticResource LoadingIndicatorTemplate}"
                                   Tag="LoadingPlaceholder"

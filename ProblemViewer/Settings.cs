@@ -15,7 +15,7 @@ namespace ProblemViewer
 
         private static string _repositoryURL = "https://github.com/Hot-Summer-1/MOProblems.git";
         public static readonly string LocalRepositoryPath = System.IO.Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "MOProblemsReader", "MOProblems");
         private static bool _autoUpdate = true;
         private static bool _forceupdaterequired = false;
