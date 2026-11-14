@@ -1,10 +1,13 @@
 ﻿using Microsoft.Win32;
+using MOProblemsReader.Logging;
 using ProblemViewer;
+using Serilog;
 using System.Globalization;
 using System.Text;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Threading;
+using Microsoft.VisualBasic;
 
 namespace MOProblemsReader
 {
@@ -30,21 +33,61 @@ namespace MOProblemsReader
 
         private void Application_Exit(object sender, ExitEventArgs e)
         {
-            // SystemEvents 是静态事件，会持有 App 的强引用，不退订会导致应用对象无法回收
+            // SystemEvents、AppDomain、TaskScheduler 都是静态事件源，会持有 App 的强引用，
+            // 不退订会导致应用对象无法回收
             SystemEvents.UserPreferenceChanged -= OnUserPreferenceChanged;
+            AppDomain.CurrentDomain.UnhandledException -= CurrentDomain_UnhandledException;
+            TaskScheduler.UnobservedTaskException -= TaskScheduler_UnobservedTaskException;
             Settings.SaveSettings();
+            if(Settings.ForceUpdateRequired) Log.Information("ForceUpdateRequired is set to true, the repository will be forced to update at next launch.");
+            Log.Information("Application exited normally.");
+            // 退出前必须刷盘，否则缓冲区中最后几条日志会随进程结束而丢失
+            LoggingExtension.CloseAndFlush();
         }
 
         private void App_DispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
         {
+            if (Settings.ForceUpdateRequired) Log.Information("ForceUpdateRequired is set to true, the repository will be forced to update at next launch.");
+            Log.Fatal(e.Exception, "Unhandled exception on UI thread, application is shutting down.");
+            // 下面的 Environment.Exit(1) 会绕过正常退出流程，所以此处显式刷盘，避免这条致命日志丢失
+            LoggingExtension.CloseAndFlush();
             MessageBox.Show($"应用程序遇到错误: {e.Exception.Message}", "应用程序错误", MessageBoxButton.OK, MessageBoxImage.Error);
             e.Handled = true;
             Environment.Exit(1);
         }
 
+        /// <summary>
+        /// 非 UI 线程上未处理异常的回调：此时进程通常会被运行时终止，只能尽量留下现场记录。
+        /// </summary>
+        /// <param name="sender">事件源（当前 AppDomain）。</param>
+        /// <param name="e">事件参数，<see cref="UnhandledExceptionEventArgs.IsTerminating"/> 指示进程是否会终止。</param>
+        private void CurrentDomain_UnhandledException(object sender, UnhandledExceptionEventArgs e)
+        {
+            if (Settings.ForceUpdateRequired) Log.Information("ForceUpdateRequired is set to true, the repository will be forced to update at next launch.");
+            Log.Fatal(e.ExceptionObject as Exception, "Unhandled exception on a non-UI thread, process is terminating. IsTerminating: {IsTerminating}", e.IsTerminating);
+            // 进程马上终止，先把这条日志落盘
+            LoggingExtension.CloseAndFlush();
+        }
+
+        /// <summary>
+        /// 未被观察的任务异常回调：常见于 <c>async void</c> 或未 await 的 Task，记录后可定位遗漏的 await。
+        /// </summary>
+        /// <param name="sender">事件源（通常为 null）。</param>
+        /// <param name="e">事件参数，包含未被观察的聚合异常。</param>
+        private void TaskScheduler_UnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs e)
+        {
+            Log.Error(e.Exception, "Unobserved exception in a background task.");
+        }
+
         private void Application_Startup(object sender, StartupEventArgs e)
         {
+            // 日志必须在其它初始化之前建立，否则启动阶段的异常会无处记录
+            LoggingExtension.Initialize();
+            Log.Information("Application started.");
+
             DispatcherUnhandledException += App_DispatcherUnhandledException;
+            AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
+            TaskScheduler.UnobservedTaskException += TaskScheduler_UnobservedTaskException;
             InitializeAccentBrush();
 
             Settings.LoadSettings();
@@ -115,6 +158,7 @@ namespace MOProblemsReader
                 return;
             }
 
+            Log.Debug("Accent color changed.");
             // 该回调可能由非 UI 线程触发，操作 ResourceDictionary 必须切回 UI 线程
             Dispatcher.Invoke(RefreshAccentBrush);
         }

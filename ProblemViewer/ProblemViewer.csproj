@@ -12,4 +12,8 @@
     <PackageReference Include="LibGit2Sharp.NativeBinaries" Version="2.0.324" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\MOProblemsReader.Logging\MOProblemsReader.Logging.csproj" />
+  </ItemGroup>
+
 </Project>

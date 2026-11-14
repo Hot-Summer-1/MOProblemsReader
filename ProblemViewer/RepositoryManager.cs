@@ -1,4 +1,6 @@
-﻿using System;
+﻿using MOProblemsReader.Logging;
+using Serilog;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -16,19 +18,22 @@ namespace ProblemViewer
 
         }
     }
+
+    
     public static class RepositoryManager
 
     {
         public static bool Working { get; private set; } = false;
 
-        public static void UpdateRepository(Window? parentwindow=null)
+        public static void UpdateRepository(Window? parentwindow=null,EventHandler<RepositoryUpdatedEventArgs>? handler=null)
         {
             Application.Current.Dispatcher.Invoke(() =>
             {
                 var updateWindow = new UpdateWindow
                 {
-                    Owner = parentwindow 
+                    Owner = parentwindow,
                 };
+                if (handler!=null)updateWindow.RepositoryUpdated += handler;
                 updateWindow.ShowDialog();
             });
             
@@ -36,6 +41,7 @@ namespace ProblemViewer
         public static void UpdateRepositoryWorker()
         {
             Working = true;
+            Log.Information("Begin repository update. Repository,URL: {RepositoryURL}",Settings.RepositoryURL);
             if (Settings.ForceUpdateRequired)
             {
                 /*var startInfo = new ProcessStartInfo
@@ -47,6 +53,7 @@ namespace ProblemViewer
 
                 var p = Process.Start(startInfo);
                 p.WaitForExit();*/
+                Log.Information("Force update is required. Now deleting existed repository.");
                 try
                 {
                     foreach (string file in Directory.EnumerateFileSystemEntries(Settings.LocalRepositoryPath, "*",
@@ -59,10 +66,12 @@ namespace ProblemViewer
                 }
                 catch (DirectoryNotFoundException)
                 {
-                    //Do nothing
+                    // 本地题库目录本就不存在属于预期情况，不算错误，仅留下可追溯的记录
+                    Log.Information("Repository directory to clean does not exist, skipping deletion. RepositoryPath: {RepositoryPath}", Settings.LocalRepositoryPath);
                 }
                 catch (Exception ex)
                 {
+                    // 删除旧题库失败会导致后续 clone 在脏目录上进行，必须记录完整异常以便排查残留文件权限问题
                     Working = false;
                     throw new RepositoryUpdateException($"Error deleting existed files: {ex.Message}", ex);
                 }
@@ -97,8 +106,7 @@ namespace ProblemViewer
                         throw new RepositoryUpdateException($"Error updating existed repository: {ex.Message}", ex);
                     }
                 }
-            
-
+            Log.Information("Repository update finished.");
             Settings.ForceUpdateRequired = false;
             Working = false;
         }

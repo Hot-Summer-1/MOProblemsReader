@@ -12,6 +12,7 @@ using System.Windows.Navigation;
 using System.Windows.Shapes;
 using LibGit2Sharp;
 using ProblemViewer;
+using Serilog;
 using Path = System.IO.Path;
 
 namespace MOProblemsReader
@@ -22,6 +23,13 @@ namespace MOProblemsReader
     /// </summary>
     public partial class MainWindow : Window
     {
+        private Dictionary<string, bool> loaddict = new Dictionary<string, bool>
+        {
+            ["china"] = false,
+            ["abroad"]=false,
+            ["university"]=false,
+            ["original"]=false
+        };
         /// <summary>
         /// 「加载中」占位子项的标记值，必须与 MainWindow.xaml 中占位项的 Tag 字面量保持一致。
         /// </summary>
@@ -32,6 +40,16 @@ namespace MOProblemsReader
         /// </summary>
         private const string LoadingIndicatorTemplateKey = "LoadingIndicatorTemplate";
 
+        /// <summary>
+        /// 「更新」命令，供菜单项与 Ctrl+U 快捷键共用同一执行入口。
+        /// </summary>
+        /// <remarks>
+        /// 用 RoutedUICommand 而非额外引入 MVVM 命令库，可让 XAML 中的菜单、快捷键
+        /// 与 code-behind 处理器在同一个路由命令上集中绑定，避免逻辑出现两份。
+        /// </remarks>
+        public static RoutedUICommand UpdateCommand { get; } =
+            new("更新", nameof(UpdateCommand), typeof(MainWindow));
+
         public MainWindow()
         {
             Application.Current.ShutdownMode = ShutdownMode.OnLastWindowClose;
@@ -40,9 +58,54 @@ namespace MOProblemsReader
 
         private void ExitMenuItem_Click(object sender, RoutedEventArgs e)
         {
-            this.Close();
+            Close();
         }
 
+        private void UpdateWindow_RepositoryUpdated(object? sender, RepositoryUpdatedEventArgs e)
+        {
+            if (e.Success)
+            {
+                china.IsEnabled = true;
+                abroad.IsEnabled = true;
+                university.IsEnabled = true;
+                original.IsEnabled = true;
+                RefreshNode(china);
+                RefreshNode(abroad);
+                RefreshNode(university);
+                RefreshNode(original);
+            }
+            else
+            {
+                ProtectNode(china);
+                ProtectNode(abroad);
+                ProtectNode(university);
+                ProtectNode(original);
+            }
+        }
+
+        private void ProtectNode(TreeViewItem node)
+        {
+            if (!loaddict[node.Name])
+            {
+                node.IsExpanded = false;
+                node.IsEnabled = false;
+            }
+        }
+        private void RefreshNode(TreeViewItem node)
+        {
+            if (loaddict[node.Name])
+            {
+                node.ItemsSource= null;
+                node.Items.Clear();
+                loaddict[node.Name] = false;
+                node.Items.Add(CreateLoadingPlaceholder());
+                if (node.IsExpanded)
+                {
+                    UpdateNode(node);
+                }
+            }
+
+        }
         /// <summary>
         /// 打开"关于"对话框。
         /// </summary>
@@ -55,9 +118,14 @@ namespace MOProblemsReader
             aboutWindow.ShowDialog();  // 模态显示
         }
 
-        private void UpdateMenuItem_Click(object sender, RoutedEventArgs e)
+        /// <summary>
+        /// 「更新」命令的执行处理器：无论是点击菜单项还是按下 Ctrl+U，都从这里进入更新流程。
+        /// </summary>
+        /// <param name="sender">命令路由的发送者，此处不使用。</param>
+        /// <param name="e">命令执行参数，此处不使用。</param>
+        private void UpdateCommand_Executed(object sender, ExecutedRoutedEventArgs e)
         {
-            RepositoryManager.UpdateRepository(this);
+            RepositoryManager.UpdateRepository(this,UpdateWindow_RepositoryUpdated);
         }
 
         private void SourceMenuItem_Click(object sender, RoutedEventArgs e)
@@ -74,7 +142,7 @@ namespace MOProblemsReader
         /// </summary>
         /// <param name="sender">事件源。由于挂接在 TreeView 上，此处通常是 TreeView 而非被展开的节点。</param>
         /// <param name="e">路由事件参数，其中 OriginalSource 才是真正被展开的 TreeViewItem。</param>
-        private async void ProblemTreeView_ItemExpanded(object sender, RoutedEventArgs e)
+        private void ProblemTreeView_ItemExpanded(object sender, RoutedEventArgs e)
         {
             // Expanded 是冒泡路由事件：任意深度节点展开都会冒泡到 TreeView，
             // 因此必须用 OriginalSource 定位真正展开的节点，不能直接强转 sender。
@@ -93,6 +161,52 @@ namespace MOProblemsReader
             {
                 return;
             }
+            UpdateNode(node);
+        }
+
+        /// <summary>
+        /// 加载指定节点的子节点。当前仅搭建 UI 架子，尚未接入真实题库数据。
+        /// </summary>
+        /// <param name="node">需要加载子节点的树节点（国内 / 国外 / 大学 / 原创 之一）。</param>
+        private List<CompetitionInfo> LoadChildrenAsync(string nodeName)
+        {
+            // TODO: 接入真实数据时在此按 node 异步拉取题目集合并逐个添加为子节点。
+            Log.Information("Begin to load competitions under node {nodeName}.",nodeName);
+            string CompetitonPath = Path.Combine(Settings.LocalRepositoryPath,"problems");
+            switch (nodeName)
+            {
+                case "china":
+                case "abroad":
+                case "university":
+                case "original": 
+                    CompetitonPath = Path.Combine(CompetitonPath, nodeName);
+                    break;
+                default:
+                    throw new ArgumentException($"Invalid node name:{nodeName}.");
+            }
+
+            var compInfoItems = new List<CompetitionInfo>();
+            foreach (string dir in Directory.EnumerateDirectories(CompetitonPath))
+            {
+                try
+                {
+                    string name = new DirectoryInfo(dir).Name, infofile = Path.Combine(dir, "info.json");
+                    string jsonInfoString = File.ReadAllText(infofile);
+                    CompetitionInfo compinfo = JsonSerializer.Deserialize<CompetitionInfo>(jsonInfoString)!;
+                    compinfo.name = name;
+                    compInfoItems.Add(compinfo);
+                }
+                catch(Exception ex)
+                {
+                    Log.Warning(ex,"Load competition {name} failed.", Path.GetFileName(dir.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)));
+                }
+            }
+            Log.Information("Finish loading competitions under node {nodeName}.", nodeName);
+            return compInfoItems;
+        }
+
+        private async void UpdateNode(TreeViewItem node)
+        {
             var nodeName = node.Name;
             try
             {
@@ -119,49 +233,18 @@ namespace MOProblemsReader
                     nodeitemlist.Add(comptreeviewitem);
                 }
                 node.ItemsSource = nodeitemlist;
+                loaddict[nodeName] = true;
             }
             catch (Exception ex)
             {
+                // 记录节点名，便于根据日志定位是哪个分类的题库数据损坏
+                Log.Error(ex, "Failed to load competitions under node {NodeName}.", nodeName);
                 MessageBox.Show(this, $"加载竞赛条目时遇到错误: {ex.Message}", "竞赛条目加载错误", MessageBoxButton.OK,
                     MessageBoxImage.Error);
                 node.IsExpanded = false;
                 node.IsEnabled = false;
             }
-            
         }
-
-        /// <summary>
-        /// 加载指定节点的子节点。当前仅搭建 UI 架子，尚未接入真实题库数据。
-        /// </summary>
-        /// <param name="node">需要加载子节点的树节点（国内 / 国外 / 大学 / 原创 之一）。</param>
-        private List<CompetitionInfo> LoadChildrenAsync(string nodeName)
-        {
-            // TODO: 接入真实数据时在此按 node 异步拉取题目集合并逐个添加为子节点。
-            string CompetitonPath = Path.Combine(Settings.LocalRepositoryPath,"problems");
-            switch (nodeName)
-            {
-                case "china":
-                case "abroad":
-                case "university":
-                case "original": 
-                    CompetitonPath = Path.Combine(CompetitonPath, nodeName);
-                    break;
-                default:
-                    throw new ArgumentException($"Invalid node name:{nodeName}.");
-            }
-
-            var compInfoItems = new List<CompetitionInfo>();
-            foreach (string dir in Directory.EnumerateDirectories(CompetitonPath))
-            {
-                string name = new DirectoryInfo(dir).Name, infofile = Path.Combine(dir, "info.json");
-                string jsonInfoString = File.ReadAllText(infofile);
-                CompetitionInfo compinfo = JsonSerializer.Deserialize<CompetitionInfo>(jsonInfoString)!;
-                compinfo.name = name;
-                compInfoItems.Add(compinfo);
-            }
-            return compInfoItems;
-        }
-
         /// <summary>
         /// 判断指定节点下是否还存在「加载中」占位子项。
         /// </summary>
@@ -198,29 +281,6 @@ namespace MOProblemsReader
             }
         }
 
-        /// <summary>
-        /// 在指定节点下重新显示「加载中」转圈占位，供后续异步加载过程中复用。
-        /// </summary>
-        /// <param name="node">需要显示加载状态的树节点。</param>
-        private void BeginLoading(TreeViewItem node)
-        {
-            // 幂等保护：已有占位时直接返回，避免反复展开/加载叠加出多个转圈。
-            if (HasLoadingPlaceholder(node))
-            {
-                return;
-            }
-
-            node.Items.Add(CreateLoadingPlaceholder());
-        }
-
-        /// <summary>
-        /// 隐藏指定节点下的「加载中」占位，表示加载已结束。
-        /// </summary>
-        /// <param name="node">需要结束加载状态的树节点。</param>
-        private void EndLoading(TreeViewItem node)
-        {
-            RemoveLoadingPlaceholder(node);
-        }
 
         /// <summary>
         /// 以代码方式创建一个复用 XAML 模板的「加载中」占位子项。

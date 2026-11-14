@@ -1,6 +1,7 @@
 using Microsoft.Win32;
-using System.Windows.Media.Converters;
 using System.IO;
+using Serilog;
+
 namespace ProblemViewer
 {
     /// <summary>
@@ -14,7 +15,7 @@ namespace ProblemViewer
         public static readonly string RegKeyPath = @"Software\MOProblemsReader";
 
         private static string _repositoryURL = "https://github.com/Hot-Summer-1/MOProblems.git";
-        public static readonly string LocalRepositoryPath = System.IO.Path.Combine(
+        public static readonly string LocalRepositoryPath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "MOProblemsReader", "MOProblems");
         private static bool _autoUpdate = true;
@@ -64,8 +65,11 @@ namespace ProblemViewer
 
             RegistryKey? key = Registry.CurrentUser.OpenSubKey(RegKeyPath);
             if (key == null)
+            {
+                ForceUpdateRequired = true;
+                Log.Information("Registry key not found, use default value.");
                 return; // 注册表项不存在，使用默认值
-
+            }
             if (key.GetValue("RepositoryURL") is string repoUrl && !string.IsNullOrWhiteSpace(repoUrl))
                 _repositoryURL = repoUrl;
             if (key.GetValue("AutoUpdate") is int autoUpdateInt)
@@ -73,7 +77,8 @@ namespace ProblemViewer
             if (key.GetValue("ForceUpdateRequired") is int forceUpdateRequiredInt)
                 _forceupdaterequired = forceUpdateRequiredInt != 0;
             key.Close();
-
+            Log.Information("Settings Loaded.");
+            Log.Debug("Loaded value: RepositoryURL: {RepositoryURL}; AutoUpdate: {AutoUpdate}; ForceUpdateRequired:{ForceUpdateRequired}",RepositoryURL,AutoUpdate,ForceUpdateRequired);
         }
 
         /// <summary>
@@ -87,6 +92,8 @@ namespace ProblemViewer
             key.SetValue("AutoUpdate", _autoUpdate ? 1 : 0, RegistryValueKind.DWord);
             //key.SetValue("ForceUpdateRequired", _forceupdaterequired ? 1 : 0, RegistryValueKind.DWord);
             key.Close();
+            Log.Information("Settings Saved.");
+            Log.Debug("Saved value: RepositoryURL: {RepositoryURL}; AutoUpdate: {AutoUpdate}", RepositoryURL, AutoUpdate);
 
         }
     }

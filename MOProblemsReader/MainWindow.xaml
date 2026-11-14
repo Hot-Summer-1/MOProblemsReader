@@ -7,6 +7,17 @@
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
         mc:Ignorable="d"
         Title="数学竞赛问题集" Height="450" Width="800">
+    <!--
+        Ctrl+U 快捷键：InputGestureText 只负责在菜单右侧显示提示文字，不产生任何键盘绑定；
+        真正的按键映射由 InputBindings 中的 KeyBinding 提供，两者都写快捷键才会生效。
+        菜单项与快捷键共用同一个 UpdateCommand，执行逻辑只保留一份。
+    -->
+    <Window.CommandBindings>
+        <CommandBinding Command="local:MainWindow.UpdateCommand" Executed="UpdateCommand_Executed"/>
+    </Window.CommandBindings>
+    <Window.InputBindings>
+        <KeyBinding Key="U" Modifiers="Ctrl" Command="local:MainWindow.UpdateCommand"/>
+    </Window.InputBindings>
     <Window.Resources>
         <!--
             加载中占位模板：用原生 ProgressBar 套 MaterialDesign 的环形样式（MaterialDesignCircularProgressBar）。
@@ -34,8 +45,8 @@
         <!-- 顶部菜单栏 -->
         <Menu DockPanel.Dock="Top">
             <MenuItem Header="文件(_F)" >
-                <MenuItem Header="更新(_U)" InputGestureText="Ctrl+U" Click="UpdateMenuItem_Click"/>
-                <MenuItem Header="题源...(_S)" Click="SourceMenuItem_Click"/>
+                <MenuItem Header="更新(_U)" InputGestureText="Ctrl+U" Command="local:MainWindow.UpdateCommand"/>
+                <MenuItem Header="设置...(_S)" Click="SourceMenuItem_Click"/>
                 <Separator/>
                 <MenuItem Header="退出(_X)" InputGestureText="Alt+F4" Click="ExitMenuItem_Click"/>
             </MenuItem>

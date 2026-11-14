@@ -16,6 +16,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\MOProblemsReader.Logging\MOProblemsReader.Logging.csproj" />
     <ProjectReference Include="..\ProblemViewer\ProblemViewer.csproj" />
   </ItemGroup>
 
