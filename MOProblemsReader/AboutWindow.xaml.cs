@@ -1,5 +1,4 @@
-﻿using System.Linq;
-using System.Reflection;
+﻿using System.Reflection;
 using System.Windows;
 
 namespace MOProblemsReader
@@ -36,7 +35,7 @@ namespace MOProblemsReader
         /// </summary>
         private void OkButton_Click(object sender, RoutedEventArgs e)
         {
-            this.Close();
+            Close();
         }
     }
 }

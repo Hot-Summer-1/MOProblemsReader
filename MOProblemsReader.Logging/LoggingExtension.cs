@@ -1,4 +1,5 @@
 ﻿using Serilog;
+using Serilog.Core;
 using Serilog.Events;
 using System.Globalization;
 using System.Text;
@@ -10,6 +11,7 @@ namespace MOProblemsReader.Logging
     /// </summary>
     public static class LoggingExtension
     {
+        public static readonly LoggingLevelSwitch LevelSwitch = new(LogEventLevel.Information);
         /// <summary>
         /// 日志文件名模板：位于当前用户的 LocalApplicationData 目录。
         /// 其中 <c>{Date}</c> 是 Serilog 的滚动日期占位符，按天滚动时被替换为 <c>yyyyMMdd</c>，
@@ -23,13 +25,13 @@ namespace MOProblemsReader.Logging
         /// 与 <see cref="LogPath"/> 不同，该路径指向磁盘上实际存在的文件，可直接展示给用户。
         /// </summary>
         public static string CurrentLogFilePath =>
-            LogPath.Replace("-.log", "-"+DateTime.Now.ToString("yyyyMMdd", CultureInfo.InvariantCulture)+".log");
+            LogPath.Replace("-.log", "-" + DateTime.Now.ToString("yyyyMMdd", CultureInfo.InvariantCulture) + ".log");
 
         /// <summary>
         /// 文件与控制台共用的输出模板：时间、级别、消息正文与异常堆栈。
         /// </summary>
         private const string OutputTemplate =
-            "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {Message:lj}{NewLine}{Exception}";
+            "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} PID: {ProcessId} [{Level}] {Message:lj}{NewLine}{Exception}";
 
         /// <summary>
         /// 保留的历史日志文件个数，防止日志长期累积占满磁盘。
@@ -52,17 +54,18 @@ namespace MOProblemsReader.Logging
         /// <param name="minimumLevel">最低记录级别，默认为 <see cref="LogEventLevel.Information"/>。</param>
         /// <exception cref="IOException">日志文件无法创建或写入时由 Serilog 文件 sink 抛出。</exception>
         /// <exception cref="UnauthorizedAccessException">日志所在目录无写入权限时由 Serilog 文件 sink 抛出。</exception>
-        public static void Initialize(LogEventLevel minimumLevel = LogEventLevel.Information)
+        public static void Initialize()
         {
             if (_initialized)
             {
                 return;
             }
 #if DEBUG
-            minimumLevel = LogEventLevel.Debug;
+            LevelSwitch.MinimumLevel = LogEventLevel.Debug;
 #endif
             Log.Logger = new LoggerConfiguration()
-                .MinimumLevel.Is(minimumLevel)
+                .MinimumLevel.ControlledBy(LevelSwitch)
+                .Enrich.WithProcessId()
                 .Enrich.FromLogContext()
                 // shared: true 允许同一用户同时运行的多个应用实例写同一个日志文件
                 .WriteTo.File(
@@ -79,7 +82,7 @@ namespace MOProblemsReader.Logging
 
             _initialized = true;
             // 日志文本统一使用英文，便于跨语言环境检索与检索工具处理
-            Log.Information("Logging system started. Log file path: {LogFilePath}", CurrentLogFilePath);
+            Log.Information("Logging system started. Log file path: {LogFilePath}", CurrentLogFilePath, LevelSwitch.MinimumLevel);
         }
 
         /// <summary>

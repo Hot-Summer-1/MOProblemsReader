@@ -3,14 +3,28 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:log="clr-namespace:Serilog.Events;assembly=Serilog"
+        xmlns:sys="clr-namespace:System;assembly=System.Runtime"
         xmlns:local="clr-namespace:MOProblemsReader"
         mc:Ignorable="d"
-        Title="题源" Height="220" Width="700"
+        Title="设置" Height="250" Width="700"
         ResizeMode="NoResize"
         WindowStartupLocation="CenterOwner"
-        ShowInTaskbar="False">
+        ShowInTaskbar="False" Loaded="Window_Loaded">
+    <Window.Resources>
+        <ObjectDataProvider x:Key="StatusValues"
+                            MethodName="GetValues"
+                            ObjectType="{x:Type sys:Enum}">
+            <ObjectDataProvider.MethodParameters>
+                <x:Type TypeName="log:LogEventLevel"/>
+            </ObjectDataProvider.MethodParameters>
+        </ObjectDataProvider>
+    </Window.Resources>
+
     <Grid Margin="20">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="20"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="20"/>
             <RowDefinition Height="Auto"/>
@@ -20,9 +34,9 @@
             <ColumnDefinition></ColumnDefinition>
             <ColumnDefinition></ColumnDefinition>
             <ColumnDefinition></ColumnDefinition>
-            
+
             <ColumnDefinition></ColumnDefinition>
-            
+
             <ColumnDefinition></ColumnDefinition>
             <ColumnDefinition></ColumnDefinition>
             <ColumnDefinition></ColumnDefinition>
@@ -33,10 +47,11 @@
         <TextBox Name="RepositoryURLTextBox" Grid.Row="0"  Grid.Column="1" Grid.ColumnSpan="7" VerticalAlignment="Center"/>
         <Button Content="更新(_U)" Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Click="UpdateButton_Click"/>
         <CheckBox Name="AutoUpdateCheckBox" Content="启用自动更新"  Grid.Row="2" Grid.Column="2" Grid.ColumnSpan="2" VerticalAlignment="Center"/>
-        <Button Content="确定" Grid.Row="3" Grid.Column="5" Width="75" VerticalAlignment="Bottom" Style="{DynamicResource AccentButtonStyle}" IsDefault="True" Click="ConfirmButton_Click"/>
-        <Button Content="取消" Grid.Row="3" Grid.Column="6" Width="75" VerticalAlignment="Bottom" Click="CancelButton_Click"/>
-        <Button Content="应用" Grid.Row="3" Grid.Column="7" Width="75" VerticalAlignment="Bottom" Style="{DynamicResource AccentButtonStyle}" Click="ApplyButton_Click"/>
-
+        <TextBlock Grid.Row="4" Grid.Column="0" Text="日志级别:"  VerticalAlignment="Center"/>
+        <ComboBox Grid.Row="4"  HorizontalAlignment="Left" Grid.ColumnSpan="2" Grid.Column="1" Name="LogLevelComboBox" ItemsSource="{Binding Source={StaticResource StatusValues}}"/>
+        <Button Content="确定" Grid.Row="5" Grid.Column="5" Width="75" VerticalAlignment="Bottom" Style="{DynamicResource AccentButtonStyle}" IsDefault="True" Click="ConfirmButton_Click"/>
+        <Button Content="取消" Grid.Row="5" Grid.Column="6" Width="75" VerticalAlignment="Bottom" Click="CancelButton_Click"/>
+        <Button Content="应用" Grid.Row="5" Grid.Column="7" Width="75" VerticalAlignment="Bottom" Style="{DynamicResource AccentButtonStyle}" Click="ApplyButton_Click"/>
 
     </Grid>
 </Window>

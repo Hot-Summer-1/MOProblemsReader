@@ -6,7 +6,7 @@
         xmlns:local="clr-namespace:MOProblemsReader"
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
         mc:Ignorable="d"
-        Title="数学竞赛问题集" Height="450" Width="800">
+        Title="数学竞赛问题集" Height="450" Width="800" Loaded="Window_Loaded" Closed="Window_Closed">
     <!--
         Ctrl+U 快捷键：InputGestureText 只负责在菜单右侧显示提示文字，不产生任何键盘绑定；
         真正的按键映射由 InputBindings 中的 KeyBinding 提供，两者都写快捷键才会生效。

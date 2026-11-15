@@ -1,13 +1,11 @@
-﻿using Microsoft.Win32;
+﻿using System.IO;
+using Microsoft.Win32;
 using MOProblemsReader.Logging;
 using ProblemViewer;
 using Serilog;
-using System.Globalization;
-using System.Text;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Threading;
-using Microsoft.VisualBasic;
 
 namespace MOProblemsReader
 {
@@ -39,7 +37,7 @@ namespace MOProblemsReader
             AppDomain.CurrentDomain.UnhandledException -= CurrentDomain_UnhandledException;
             TaskScheduler.UnobservedTaskException -= TaskScheduler_UnobservedTaskException;
             Settings.SaveSettings();
-            if(Settings.ForceUpdateRequired) Log.Information("ForceUpdateRequired is set to true, the repository will be forced to update at next launch.");
+            if (Settings.ForceUpdateRequired) Log.Information("ForceUpdateRequired is set to true, the repository will be forced to update at next launch.");
             Log.Information("Application exited normally.");
             // 退出前必须刷盘，否则缓冲区中最后几条日志会随进程结束而丢失
             LoggingExtension.CloseAndFlush();
@@ -52,8 +50,6 @@ namespace MOProblemsReader
             // 下面的 Environment.Exit(1) 会绕过正常退出流程，所以此处显式刷盘，避免这条致命日志丢失
             LoggingExtension.CloseAndFlush();
             MessageBox.Show($"应用程序遇到错误: {e.Exception.Message}", "应用程序错误", MessageBoxButton.OK, MessageBoxImage.Error);
-            e.Handled = true;
-            Environment.Exit(1);
         }
 
         /// <summary>
@@ -91,6 +87,9 @@ namespace MOProblemsReader
             InitializeAccentBrush();
 
             Settings.LoadSettings();
+            if (!Directory.Exists(Settings.LocalRepositoryPath) ||
+                !Directory.EnumerateFileSystemEntries(Settings.LocalRepositoryPath).Any())
+                Settings.ForceUpdateRequired = true;
             if (Settings.ForceUpdateRequired)
             {
                 ShutdownMode = ShutdownMode.OnExplicitShutdown;

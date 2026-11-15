@@ -1,34 +1,26 @@
 ﻿using System.IO;
-using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Text.Json;
-using System.Windows.Data;
-using System.Windows.Documents;
 using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
-using LibGit2Sharp;
 using ProblemViewer;
 using Serilog;
 using Path = System.IO.Path;
 
 namespace MOProblemsReader
 {
-    
+
     /// <summary>
     /// Interaction logic for MainWindow.xaml
     /// </summary>
     public partial class MainWindow : Window
     {
-        private Dictionary<string, bool> loaddict = new Dictionary<string, bool>
+        private Dictionary<string, bool> loaddict = new()
         {
             ["china"] = false,
-            ["abroad"]=false,
-            ["university"]=false,
-            ["original"]=false
+            ["abroad"] = false,
+            ["university"] = false,
+            ["original"] = false
         };
         /// <summary>
         /// 「加载中」占位子项的标记值，必须与 MainWindow.xaml 中占位项的 Tag 字面量保持一致。
@@ -61,10 +53,11 @@ namespace MOProblemsReader
             Close();
         }
 
-        private void UpdateWindow_RepositoryUpdated(object? sender, RepositoryUpdatedEventArgs e)
+        private void RepositoryManager_RepositoryUpdated(object? sender, RepositoryUpdatedEventArgs e)
         {
             if (e.Success)
             {
+                Log.Information("Repository updated. Reload the nodes.");
                 china.IsEnabled = true;
                 abroad.IsEnabled = true;
                 university.IsEnabled = true;
@@ -76,6 +69,7 @@ namespace MOProblemsReader
             }
             else
             {
+                Log.Warning("Repository update failed. Now disable the unloaded nodes.");
                 ProtectNode(china);
                 ProtectNode(abroad);
                 ProtectNode(university);
@@ -95,10 +89,8 @@ namespace MOProblemsReader
         {
             if (loaddict[node.Name])
             {
-                node.ItemsSource= null;
-                node.Items.Clear();
+                node.ItemsSource = new List<TreeViewItem> { CreateLoadingPlaceholder() };
                 loaddict[node.Name] = false;
-                node.Items.Add(CreateLoadingPlaceholder());
                 if (node.IsExpanded)
                 {
                     UpdateNode(node);
@@ -125,7 +117,7 @@ namespace MOProblemsReader
         /// <param name="e">命令执行参数，此处不使用。</param>
         private void UpdateCommand_Executed(object sender, ExecutedRoutedEventArgs e)
         {
-            RepositoryManager.UpdateRepository(this,UpdateWindow_RepositoryUpdated);
+            RepositoryManager.UpdateRepository(this);
         }
 
         private void SourceMenuItem_Click(object sender, RoutedEventArgs e)
@@ -171,18 +163,17 @@ namespace MOProblemsReader
         private List<CompetitionInfo> LoadChildrenAsync(string nodeName)
         {
             // TODO: 接入真实数据时在此按 node 异步拉取题目集合并逐个添加为子节点。
-            Log.Information("Begin to load competitions under node {nodeName}.",nodeName);
-            string CompetitonPath = Path.Combine(Settings.LocalRepositoryPath,"problems");
+            string CompetitonPath = Path.Combine(Settings.LocalRepositoryPath, "problems");
             switch (nodeName)
             {
                 case "china":
                 case "abroad":
                 case "university":
-                case "original": 
+                case "original":
                     CompetitonPath = Path.Combine(CompetitonPath, nodeName);
                     break;
                 default:
-                    throw new ArgumentException($"Invalid node name:{nodeName}.");
+                    throw new ArgumentException($"Invalid node name: {nodeName}.");
             }
 
             var compInfoItems = new List<CompetitionInfo>();
@@ -196,22 +187,21 @@ namespace MOProblemsReader
                     compinfo.name = name;
                     compInfoItems.Add(compinfo);
                 }
-                catch(Exception ex)
+                catch (Exception ex)
                 {
-                    Log.Warning(ex,"Load competition {name} failed.", Path.GetFileName(dir.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)));
+                    Log.Warning(ex, "Load competition {name} failed.", Path.GetFileName(dir.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)));
                 }
             }
-            Log.Information("Finish loading competitions under node {nodeName}.", nodeName);
             return compInfoItems;
         }
 
         private async void UpdateNode(TreeViewItem node)
         {
             var nodeName = node.Name;
+            Log.Debug("Begin to load competitions under node {nodeName}.", nodeName);
             try
             {
                 var item = await Task.Run(() => LoadChildrenAsync(nodeName));
-                RemoveLoadingPlaceholder(node);
                 var nodeitemlist = new List<TreeViewItem>();
                 foreach (CompetitionInfo comp in item)
                 {
@@ -232,6 +222,7 @@ namespace MOProblemsReader
                     comptreeviewitem.ItemsSource = yearlist;
                     nodeitemlist.Add(comptreeviewitem);
                 }
+                RemoveLoadingPlaceholder(node);
                 node.ItemsSource = nodeitemlist;
                 loaddict[nodeName] = true;
             }
@@ -243,7 +234,9 @@ namespace MOProblemsReader
                     MessageBoxImage.Error);
                 node.IsExpanded = false;
                 node.IsEnabled = false;
+                Settings.ForceUpdateRequired = true;
             }
+            Log.Debug("Finish loading competitions under node {nodeName}.", nodeName);
         }
         /// <summary>
         /// 判断指定节点下是否还存在「加载中」占位子项。
@@ -301,6 +294,16 @@ namespace MOProblemsReader
             // 用资源引用而非直接塞模板实例，样式改动只需改 XAML 一处。
             placeholder.SetResourceReference(HeaderedItemsControl.HeaderTemplateProperty, LoadingIndicatorTemplateKey);
             return placeholder;
+        }
+
+        private void Window_Loaded(object sender, RoutedEventArgs e)
+        {
+            RepositoryManager.RepositoryUpdated += RepositoryManager_RepositoryUpdated;
+        }
+
+        private void Window_Closed(object sender, EventArgs e)
+        {
+            RepositoryManager.RepositoryUpdated -= RepositoryManager_RepositoryUpdated;
         }
     }
 }

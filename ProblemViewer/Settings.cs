@@ -1,6 +1,10 @@
 using Microsoft.Win32;
 using System.IO;
+using System.Windows.Markup;
+using System.Windows.Media.Effects;
+using MOProblemsReader.Logging;
 using Serilog;
+using Serilog.Events;
 
 namespace ProblemViewer
 {
@@ -13,7 +17,20 @@ namespace ProblemViewer
         /// 注册表键路径（HKCU 下），用于存储和读取用户自定义设置。
         /// </summary>
         public static readonly string RegKeyPath = @"Software\MOProblemsReader";
+        private static LogEventLevel _logLevel = LogEventLevel.Information;
 
+        public static LogEventLevel LogLevel
+        {
+            get => _logLevel;
+            set
+            {
+                _logLevel = value;
+#if !DEBUG
+                LoggingExtension.LevelSwitch.MinimumLevel = value;
+                Log.Information("Log level is set to {LogLevel}.",value);
+#endif
+            }
+        }
         private static string _repositoryURL = "https://github.com/Hot-Summer-1/MOProblems.git";
         public static readonly string LocalRepositoryPath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -24,7 +41,6 @@ namespace ProblemViewer
         /// <summary>
         /// 属性
         /// </summary>
-
         public static bool ForceUpdateRequired
         {
             get => _forceupdaterequired;
@@ -52,10 +68,6 @@ namespace ProblemViewer
                 _autoUpdate = value;
             }
         }
-
-
-
-
         /// <summary>
         /// 从注册表 <see cref="RegKeyPath"/> 加载用户自定义设置，覆盖默认值。
         /// 若注册表项不存在或读取失败，则静默使用默认值。
@@ -63,10 +75,9 @@ namespace ProblemViewer
         public static void LoadSettings()
         {
 
-            RegistryKey? key = Registry.CurrentUser.OpenSubKey(RegKeyPath);
+            using RegistryKey? key = Registry.CurrentUser.OpenSubKey(RegKeyPath);
             if (key == null)
             {
-                ForceUpdateRequired = true;
                 Log.Information("Registry key not found, use default value.");
                 return; // 注册表项不存在，使用默认值
             }
@@ -76,9 +87,13 @@ namespace ProblemViewer
                 _autoUpdate = autoUpdateInt != 0;
             if (key.GetValue("ForceUpdateRequired") is int forceUpdateRequiredInt)
                 _forceupdaterequired = forceUpdateRequiredInt != 0;
+            if (key.GetValue("LogLevel") is int logLevel && Enum.IsDefined(typeof(LogEventLevel), logLevel))
+            {
+                LogLevel = (LogEventLevel)logLevel;
+            }
             key.Close();
             Log.Information("Settings Loaded.");
-            Log.Debug("Loaded value: RepositoryURL: {RepositoryURL}; AutoUpdate: {AutoUpdate}; ForceUpdateRequired:{ForceUpdateRequired}",RepositoryURL,AutoUpdate,ForceUpdateRequired);
+            Log.Debug("Loaded value: RepositoryURL: {RepositoryURL}; AutoUpdate: {AutoUpdate}; ForceUpdateRequired:{ForceUpdateRequired}", RepositoryURL, AutoUpdate, ForceUpdateRequired);
         }
 
         /// <summary>
@@ -90,11 +105,11 @@ namespace ProblemViewer
             using RegistryKey key = Registry.CurrentUser.CreateSubKey(RegKeyPath, true);
             key.SetValue("RepositoryURL", _repositoryURL, RegistryValueKind.String);
             key.SetValue("AutoUpdate", _autoUpdate ? 1 : 0, RegistryValueKind.DWord);
+            key.SetValue("LogLevel", (int)LogLevel);
             //key.SetValue("ForceUpdateRequired", _forceupdaterequired ? 1 : 0, RegistryValueKind.DWord);
             key.Close();
             Log.Information("Settings Saved.");
-            Log.Debug("Saved value: RepositoryURL: {RepositoryURL}; AutoUpdate: {AutoUpdate}", RepositoryURL, AutoUpdate);
-
+            Log.Debug("Saved value: RepositoryURL: {RepositoryURL}; AutoUpdate: {AutoUpdate}; LogLevel: {LogLevel}", RepositoryURL, AutoUpdate, LogLevel);
         }
     }
 }
