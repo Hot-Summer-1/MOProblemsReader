@@ -82,7 +82,7 @@ namespace MOProblemsReader.Logging
 
             _initialized = true;
             // 日志文本统一使用英文，便于跨语言环境检索与检索工具处理
-            Log.Information("Logging system started. Log file path: {LogFilePath}", CurrentLogFilePath, LevelSwitch.MinimumLevel);
+            Log.Information("Logging system started. Log file path: {LogFilePath}", CurrentLogFilePath);
         }
 
         /// <summary>
