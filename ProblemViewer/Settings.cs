@@ -1,6 +1,7 @@
 using Microsoft.Win32;
 using System.IO;
 using Serilog;
+using MOProblemsReader.Logging;
 using Serilog.Events;
 
 namespace ProblemViewer
