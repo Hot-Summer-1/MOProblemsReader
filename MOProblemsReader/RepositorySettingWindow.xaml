@@ -24,7 +24,7 @@
     <Grid Margin="20">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="20"/>
+            <RowDefinition Height="10"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="20"/>
             <RowDefinition Height="Auto"/>
@@ -52,6 +52,6 @@
         <Button Content="确定" Grid.Row="5" Grid.Column="5" Width="75" VerticalAlignment="Bottom" Style="{DynamicResource AccentButtonStyle}" IsDefault="True" Click="ConfirmButton_Click"/>
         <Button Content="取消" Grid.Row="5" Grid.Column="6" Width="75" VerticalAlignment="Bottom" Click="CancelButton_Click"/>
         <Button Content="应用" Grid.Row="5" Grid.Column="7" Width="75" VerticalAlignment="Bottom" Style="{DynamicResource AccentButtonStyle}" Click="ApplyButton_Click"/>
-
+        <Button Content="导出诊断数据" Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="2" VerticalAlignment="Bottom" Click="ExportButton_OnClick" />
     </Grid>
 </Window>

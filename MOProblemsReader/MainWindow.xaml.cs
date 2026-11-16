@@ -1,10 +1,11 @@
-﻿using System.IO;
+﻿using ProblemViewer;
+using Serilog;
+using System.IO;
+using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
-using System.Text.Json;
 using System.Windows.Input;
-using ProblemViewer;
-using Serilog;
+using System.Windows.Media;
 using Path = System.IO.Path;
 
 namespace MOProblemsReader
@@ -208,14 +209,16 @@ namespace MOProblemsReader
                     var comptreeviewitem = new TreeViewItem
                     {
                         Name = comp.name,
-                        Header = comp.display_name
+                        Header = comp.display_name,
+                        Tag="comp"
                     };
                     var yearlist = new List<TreeViewItem>();
                     foreach (YearInfo year in comp.years)
                     {
                         var yeartreeviewitem = new TreeViewItem
                         {
-                            Header = year.name
+                            Header = year.name,
+                            Tag="year"
                         };
                         yearlist.Add(yeartreeviewitem);
                     }
@@ -265,6 +268,7 @@ namespace MOProblemsReader
             // 按 Tag 识别而不是按下标删除：节点一旦填充真实数据，
             // 占位项的位置就不再固定，按下标会误删真实数据项。
             // 倒序遍历可避免边删边改集合导致索引错位。
+            if (node.ItemsSource != null) return;
             for (int i = node.Items.Count - 1; i >= 0; i--)
             {
                 if (node.Items[i] is TreeViewItem treeItem && LoadingPlaceholderTag.Equals(treeItem.Tag))
@@ -304,6 +308,21 @@ namespace MOProblemsReader
         private void Window_Closed(object sender, EventArgs e)
         {
             RepositoryManager.RepositoryUpdated -= RepositoryManager_RepositoryUpdated;
+        }
+
+        private void TreeViewItem_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+        {
+            var senderItem = (TreeViewItem)sender;
+            var source = e.OriginalSource as DependencyObject;
+            while (source != null && !(source is TreeViewItem))
+                source = VisualTreeHelper.GetParent(source);
+            if (source == senderItem)
+            {
+                if (senderItem.Tag is not string tag||tag != "year") return; 
+                var compItem = (TreeViewItem)ItemsControl.ItemsControlFromItemContainer(senderItem);
+                var categoryItem = (TreeViewItem)ItemsControl.ItemsControlFromItemContainer(compItem);
+                MessageBox.Show($"点击了{senderItem.Header}-{compItem.Header}({compItem.Name})-{categoryItem.Header}");
+            }
         }
     }
 }

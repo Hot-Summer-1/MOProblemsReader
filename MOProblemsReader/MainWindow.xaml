@@ -59,6 +59,11 @@
         <Grid>
             <!-- Expanded 是冒泡路由事件，在 TreeView 上挂接一次即可覆盖所有层级的节点 -->
             <TreeView Name="ProblemTreeView" TreeViewItem.Expanded="ProblemTreeView_ItemExpanded">
+                <TreeView.Resources>
+                    <Style TargetType="{x:Type TreeViewItem}" BasedOn="{StaticResource {x:Type TreeViewItem}}">
+                        <EventSetter Event="MouseDoubleClick" Handler="TreeViewItem_MouseDoubleClick"/>
+                    </Style>
+                </TreeView.Resources>
                 <TreeViewItem Header="国内" Name="china">
                     <!-- 占位子项：使节点在折叠态就渲染展开箭头，展开后显示转圈，由代码按 Tag 回收 -->
                     <TreeViewItem Header="Loading"
