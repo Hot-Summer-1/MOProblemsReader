@@ -12,10 +12,14 @@ namespace MOProblemsReader
 {
 
     /// <summary>
-    /// Interaction logic for MainWindow.xaml
+    /// 主窗口：以「分类 → 赛事 → 年份」的树形结构浏览题库，并承载更新、题源设置等菜单命令。
     /// </summary>
     public partial class MainWindow : Window
     {
+        /// <summary>
+        /// 记录各分类根节点是否已被真实数据填充（键为节点 <c>Name</c>）。为 <c>true</c> 表示已加载过，
+        /// 再次展开时无需重新读取数据；仓库更新后置回 <c>false</c> 以便重新加载。
+        /// </summary>
         private Dictionary<string, bool> loaddict = new()
         {
             ["china"] = false,
@@ -43,8 +47,12 @@ namespace MOProblemsReader
         public static RoutedUICommand UpdateCommand { get; } =
             new("更新", nameof(UpdateCommand), typeof(MainWindow));
 
+        /// <summary>
+        /// 创建主窗口，并把退出模式恢复为「关闭最后一个窗口即退出」。
+        /// </summary>
         public MainWindow()
         {
+            // 启动强制更新时退出模式被临时改为 OnExplicitShutdown，主窗口出现后必须改回，否则关窗不会退出
             Application.Current.ShutdownMode = ShutdownMode.OnLastWindowClose;
             InitializeComponent();
         }
@@ -54,6 +62,11 @@ namespace MOProblemsReader
             Close();
         }
 
+        /// <summary>
+        /// 仓库更新完成的回调：成功则重置各分类节点以便重新加载，失败则禁用尚未加载的节点。
+        /// </summary>
+        /// <param name="sender">事件源（<see cref="RepositoryManager"/>），此处不使用。</param>
+        /// <param name="e">事件参数，其 <c>Success</c> 表示更新是否成功。</param>
         private void RepositoryManager_RepositoryUpdated(object? sender, RepositoryUpdatedEventArgs e)
         {
             if (e.Success)
@@ -78,6 +91,10 @@ namespace MOProblemsReader
             }
         }
 
+        /// <summary>
+        /// 更新失败时禁用尚未加载过的节点，避免用户展开到不存在的题库数据。
+        /// </summary>
+        /// <param name="node">待处理的分类根节点。</param>
         private void ProtectNode(TreeViewItem node)
         {
             if (!loaddict[node.Name])
@@ -86,6 +103,10 @@ namespace MOProblemsReader
                 node.IsEnabled = false;
             }
         }
+        /// <summary>
+        /// 更新成功后重置已加载过的节点：重新挂上「加载中」占位；若节点正展开着则立刻重新加载。
+        /// </summary>
+        /// <param name="node">待重置的分类根节点。</param>
         private void RefreshNode(TreeViewItem node)
         {
             if (loaddict[node.Name])
@@ -158,12 +179,14 @@ namespace MOProblemsReader
         }
 
         /// <summary>
-        /// 加载指定节点的子节点。当前仅搭建 UI 架子，尚未接入真实题库数据。
+        /// 同步读取指定分类下每个赛事目录的 <c>info.json</c> 并构造赛事信息列表（在后台线程调用）。
         /// </summary>
-        /// <param name="node">需要加载子节点的树节点（国内 / 国外 / 大学 / 原创 之一）。</param>
+        /// <param name="nodeName">分类目录名，必须是 china / abroad / university / original 之一。</param>
+        /// <returns>读取成功的赛事信息集合；单个赛事读取失败只记日志并跳过，不影响其它赛事。</returns>
+        /// <exception cref="ArgumentException"><paramref name="nodeName"/> 不是已知分类名。</exception>
         private List<CompetitionInfo> LoadChildrenAsync(string nodeName)
         {
-            // TODO: 接入真实数据时在此按 node 异步拉取题目集合并逐个添加为子节点。
+            // TODO: 目前只加载到「赛事 → 年份」，双击年份打开题目内容的流程尚未接入。
             string CompetitonPath = Path.Combine(Settings.LocalRepositoryPath, "problems");
             switch (nodeName)
             {
@@ -196,6 +219,10 @@ namespace MOProblemsReader
             return compInfoItems;
         }
 
+        /// <summary>
+        /// 异步加载分类节点下的赛事与年份子项；失败时禁用该节点并要求下次启动强制更新，避免继续使用损坏的题库数据。
+        /// </summary>
+        /// <param name="node">需要加载子节点的分类根节点。</param>
         private async void UpdateNode(TreeViewItem node)
         {
             var nodeName = node.Name;
@@ -300,16 +327,31 @@ namespace MOProblemsReader
             return placeholder;
         }
 
+        /// <summary>
+        /// 窗口加载时订阅仓库更新完成事件。
+        /// </summary>
+        /// <param name="sender">事件源，此处不使用。</param>
+        /// <param name="e">事件参数，此处不使用。</param>
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
             RepositoryManager.RepositoryUpdated += RepositoryManager_RepositoryUpdated;
         }
 
+        /// <summary>
+        /// 窗口关闭时退订仓库更新事件。<see cref="RepositoryManager.RepositoryUpdated"/> 是静态事件，不退订会一直持有窗口引用。
+        /// </summary>
+        /// <param name="sender">事件源，此处不使用。</param>
+        /// <param name="e">事件参数，此处不使用。</param>
         private void Window_Closed(object sender, EventArgs e)
         {
             RepositoryManager.RepositoryUpdated -= RepositoryManager_RepositoryUpdated;
         }
 
+        /// <summary>
+        /// 双击年份节点的占位实现：目前只弹出该年份所属的赛事与分类，真实题目内容视图待接入。
+        /// </summary>
+        /// <param name="sender">被双击的树节点。</param>
+        /// <param name="e">鼠标事件参数，其 <c>OriginalSource</c> 用于判断双击是否落在该节点自身而非子项上。</param>
         private void TreeViewItem_MouseDoubleClick(object sender, MouseButtonEventArgs e)
         {
             var senderItem = (TreeViewItem)sender;

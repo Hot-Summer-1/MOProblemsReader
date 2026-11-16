@@ -29,6 +29,11 @@ namespace MOProblemsReader
         /// </summary>
         private const string AccentColorValueName = "AccentColor";
 
+        /// <summary>
+        /// 应用退出前的收尾：退订静态事件、保存设置并刷写日志缓冲。
+        /// </summary>
+        /// <param name="sender">事件源，此处不使用。</param>
+        /// <param name="e">退出事件参数，此处不使用。</param>
         private void Application_Exit(object sender, ExitEventArgs e)
         {
             // SystemEvents、AppDomain、TaskScheduler 都是静态事件源，会持有 App 的强引用，
@@ -43,11 +48,16 @@ namespace MOProblemsReader
             LoggingExtension.CloseAndFlush();
         }
 
+        /// <summary>
+        /// UI 线程未处理异常的回调：记录致命日志、提示用户并立即刷盘。
+        /// </summary>
+        /// <param name="sender">事件源，此处不使用。</param>
+        /// <param name="e">事件参数，携带导致崩溃的异常。</param>
         private void App_DispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
         {
             if (Settings.ForceUpdateRequired) Log.Information("ForceUpdateRequired is set to true, the repository will be forced to update at next launch.");
             Log.Fatal(e.Exception, "Unhandled exception on UI thread, application is shutting down.");
-            // 下面的 Environment.Exit(1) 会绕过正常退出流程，所以此处显式刷盘，避免这条致命日志丢失
+            // 未设置 e.Handled，应用随后会被终止，走不到 Application_Exit 的刷盘逻辑，所以此处显式刷盘
             LoggingExtension.CloseAndFlush();
             MessageBox.Show($"应用程序遇到错误: {e.Exception.Message}", "应用程序错误", MessageBoxButton.OK, MessageBoxImage.Error);
         }
@@ -75,6 +85,11 @@ namespace MOProblemsReader
             Log.Error(e.Exception, "Unobserved exception in a background task.");
         }
 
+        /// <summary>
+        /// 启动流程：先建立日志与全局异常处理，再跟随系统强调色、加载设置；仓库为空或需要强制更新时先更新仓库。
+        /// </summary>
+        /// <param name="sender">事件源，此处不使用。</param>
+        /// <param name="e">启动事件参数，此处不使用。</param>
         private void Application_Startup(object sender, StartupEventArgs e)
         {
             // 日志必须在其它初始化之前建立，否则启动阶段的异常会无处记录

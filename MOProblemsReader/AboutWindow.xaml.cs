@@ -30,9 +30,6 @@ namespace MOProblemsReader
             }
         }
 
-        /// <summary>
-        /// 点击"确定"按钮关闭窗口。
-        /// </summary>
         private void OkButton_Click(object sender, RoutedEventArgs e)
         {
             Close();

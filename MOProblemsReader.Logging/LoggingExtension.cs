@@ -11,6 +11,9 @@ namespace MOProblemsReader.Logging
     /// </summary>
     public static class LoggingExtension
     {
+        /// <summary>
+        /// 全局最低日志级别开关，运行时修改即时生效。
+        /// </summary>
         public static readonly LoggingLevelSwitch LevelSwitch = new(LogEventLevel.Information);
         /// <summary>
         /// 日志文件名模板：位于当前用户的 LocalApplicationData 目录。
@@ -49,9 +52,8 @@ namespace MOProblemsReader.Logging
         public static bool IsInitialized => _initialized;
 
         /// <summary>
-        /// 初始化全局日志配置。重复调用会被忽略。
+        /// 初始化全局日志配置：写入 <see cref="LogPath"/>，按天滚动并保留最近若干天。重复调用会被忽略。
         /// </summary>
-        /// <param name="minimumLevel">最低记录级别，默认为 <see cref="LogEventLevel.Information"/>。</param>
         /// <exception cref="IOException">日志文件无法创建或写入时由 Serilog 文件 sink 抛出。</exception>
         /// <exception cref="UnauthorizedAccessException">日志所在目录无写入权限时由 Serilog 文件 sink 抛出。</exception>
         public static void Initialize()

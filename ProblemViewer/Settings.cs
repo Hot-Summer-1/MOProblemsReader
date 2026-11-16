@@ -17,8 +17,15 @@ namespace ProblemViewer
         /// 注册表键路径（HKCU 下），用于存储和读取用户自定义设置。
         /// </summary>
         public static readonly string RegKeyPath = @"Software\MOProblemsReader";
+
+        /// <summary>
+        /// 日志最低记录级别的后备字段。
+        /// </summary>
         private static LogEventLevel _logLevel = LogEventLevel.Information;
 
+        /// <summary>
+        /// 日志最低记录级别。赋值后（Release 构建下）立即应用到全局级别开关，无需重启应用。
+        /// </summary>
         public static LogEventLevel LogLevel
         {
             get => _logLevel;
@@ -31,15 +38,31 @@ namespace ProblemViewer
 #endif
             }
         }
+        /// <summary>
+        /// 题库仓库 URL 的后备字段，初值为内置的默认仓库。
+        /// </summary>
         private static string _repositoryURL = "https://github.com/Hot-Summer-1/MOProblems.git";
+
+        /// <summary>
+        /// 题库仓库在本地的工作副本目录（<c>%LOCALAPPDATA%\MOProblemsReader\MOProblems</c>），clone/pull 与题库读取都以它为根。
+        /// </summary>
         public static readonly string LocalRepositoryPath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "MOProblemsReader", "MOProblems");
+
+        /// <summary>
+        /// 「是否允许自动更新」的后备字段。
+        /// </summary>
         private static bool _autoUpdate = true;
+
+        /// <summary>
+        /// 「是否需要强制更新」的后备字段。
+        /// </summary>
         private static bool _forceupdaterequired = false;
 
         /// <summary>
-        /// 属性
+        /// 是否需要强制更新：为 <c>true</c> 时下次启动会删除本地仓库再完整 clone。
+        /// 赋值会立即写入注册表，因此不依赖 <see cref="SaveSettings"/> 持久化。
         /// </summary>
         public static bool ForceUpdateRequired
         {
@@ -51,6 +74,9 @@ namespace ProblemViewer
                 key.SetValue("ForceUpdateRequired", _forceupdaterequired ? 1 : 0, RegistryValueKind.DWord);
             }
         }
+        /// <summary>
+        /// 题库仓库的远端 URL（git 地址），由用户在题源设置窗口中修改。
+        /// </summary>
         public static string RepositoryURL
         {
             get => _repositoryURL;
@@ -60,6 +86,9 @@ namespace ProblemViewer
             }
         }
 
+        /// <summary>
+        /// 是否允许自动更新题库仓库。
+        /// </summary>
         public static bool AutoUpdate
         {
             get => _autoUpdate;
@@ -97,8 +126,8 @@ namespace ProblemViewer
         }
 
         /// <summary>
-        /// 将当前所有设置持久化到注册表 <see cref="RegKeyPath"/>。
-        /// 若注册表项不存在则会自动创建。
+        /// 把 URL、自动更新开关与日志级别写入注册表 <see cref="RegKeyPath"/>，注册表项不存在时自动创建。
+        /// <see cref="ForceUpdateRequired"/> 由属性 setter 即时写入，不在此处处理。
         /// </summary>
         public static void SaveSettings()
         {

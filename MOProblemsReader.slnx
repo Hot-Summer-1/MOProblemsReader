@@ -1,4 +1,9 @@
 <Solution>
+  <Folder Name="/解决方案项/">
+    <File Path=".gitignore" />
+    <File Path="LICENSE" />
+    <File Path="README.md" />
+  </Folder>
   <Project Path="MOProblemsReader.Logging/MOProblemsReader.Logging.csproj" Id="f750f1de-a9f6-4910-a7ab-90acf3996c5b" />
   <Project Path="MOProblemsReader/MOProblemsReader.csproj" />
   <Project Path="ProblemViewer/ProblemViewer.csproj" Id="2071bf6f-f8a8-4d5c-bddb-254d67fa3180" />
