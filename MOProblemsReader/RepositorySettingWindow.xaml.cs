@@ -34,7 +34,7 @@ namespace MOProblemsReader
         /// <param name="message">追加在默认错误信息之后的补充说明，可为 <c>null</c>。</param>
         /// <param name="innerException">引起本次失败的内层异常，可为 <c>null</c>。</param>
         public RobocopyFailException(int exitCode, string?output=null, string? message=null, Exception? innerException = null)
-            :base($"Robocopy failed with exit code {exitCode}."+message,innerException)
+            :base($"Robocopy failed with exit code {exitCode}."+(message==null?" ":"")+message,innerException)
         {
             ExitCode = exitCode;
             Output = output;
@@ -128,14 +128,14 @@ namespace MOProblemsReader
             };
             if (saveDialog.ShowDialog(this) == true)
             {
-
+                Log.Information("Logs begin to be exported to {FileName}.", saveDialog.FileName);
                 try
                 {
                     var tempDir = Path.Combine(Path.GetTempPath(), "MOProblemsReader", "logtemp");
                     var robocopyprocinfo = new ProcessStartInfo
                     {
                         FileName = "robocopy.exe",
-                        Arguments = $"\"{logDictionary}\" \"{tempDir}\" /MIR /MT /R:0 /W:0",
+                        Arguments = $"\"{logDictionary}\" \"{tempDir}\" /MIR /MT /R:0 /W:0 /NP /NJH /NC /NS",
                         CreateNoWindow = true,
                         UseShellExecute = false,
                         RedirectStandardError = true,
@@ -149,9 +149,9 @@ namespace MOProblemsReader
                         await robocopyproc.WaitForExitAsync();
                         string output = await stdout;
                         var exitCode = robocopyproc.ExitCode;
-                        if (exitCode >= 8)
+                        if (exitCode==0||exitCode >= 8)
                         {
-                            throw new RobocopyFailException(exitCode, output);
+                            throw new RobocopyFailException(exitCode, output,"Failed to copy logs into temp dir.");
                         }
                     }
 
@@ -161,8 +161,7 @@ namespace MOProblemsReader
                         Log.Debug("Delete existed file {FileName}", saveDialog.FileName);
                     }
 
-                    await ZipFile.CreateFromDirectoryAsync(tempDir, saveDialog.FileName); //cannot read
-                    Log.Information("Logs exported to {FileName}", saveDialog.FileName);
+                    await ZipFile.CreateFromDirectoryAsync(tempDir, saveDialog.FileName);
                 }
                 catch (RobocopyFailException ex)
                 {

@@ -34,7 +34,8 @@ namespace ProblemViewer
                 _logLevel = value;
 #if !DEBUG
                 LoggingExtension.LevelSwitch.MinimumLevel = value;
-                Log.Information("Log level is set to {LogLevel}.",value);
+                
+                Log.ForContext("LogLevelChanged",true).Information("Log level is set to {LogLevel}.",value);
 #endif
             }
         }

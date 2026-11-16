@@ -66,20 +66,36 @@ namespace MOProblemsReader.Logging
             LevelSwitch.MinimumLevel = LogEventLevel.Debug;
 #endif
             Log.Logger = new LoggerConfiguration()
-                .MinimumLevel.ControlledBy(LevelSwitch)
+                .MinimumLevel.Verbose()
                 .Enrich.WithProcessId()
                 .Enrich.FromLogContext()
+                .WriteTo.Logger(lc=>lc.MinimumLevel.ControlledBy(LevelSwitch)
+                        .Filter.ByExcluding(e => e.Properties.ContainsKey("LogLevelChanged"))
                 // shared: true 允许同一用户同时运行的多个应用实例写同一个日志文件
-                .WriteTo.File(
-                    LogPath,
+                .WriteTo.Async(a=>a.File(LogPath,
                     rollingInterval: RollingInterval.Day,
                     retainedFileCountLimit: RetainedFileCountLimit,
                     shared: true,
                     outputTemplate: OutputTemplate,
                     encoding: Encoding.UTF8)
+                    )
 #if DEBUG                // Debug sink 把日志同步到 Visual Studio 的「输出」窗口，便于调试期直接观察
                 .WriteTo.Debug(outputTemplate: OutputTemplate)
 #endif
+                )
+                .WriteTo.Logger(lc=>lc.Filter.ByIncludingOnly(e=>e.Properties.ContainsKey("LogLevelChanged"))
+                        // shared: true 允许同一用户同时运行的多个应用实例写同一个日志文件
+                        .WriteTo.Async(a => a.File(LogPath,
+                            rollingInterval: RollingInterval.Day,
+                            retainedFileCountLimit: RetainedFileCountLimit,
+                            shared: true,
+                            outputTemplate: OutputTemplate,
+                            encoding: Encoding.UTF8)
+                        )
+#if DEBUG                // Debug sink 把日志同步到 Visual Studio 的「输出」窗口，便于调试期直接观察
+                        .WriteTo.Debug(outputTemplate: OutputTemplate)
+#endif
+                )
                 .CreateLogger();
 
             _initialized = true;
