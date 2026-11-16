@@ -1,6 +1,5 @@
 ﻿using System.Diagnostics;
 using Microsoft.Win32;
-using MOProblemsReader.Logging;
 using ProblemViewer;
 using Serilog.Events;
 using System.Globalization;

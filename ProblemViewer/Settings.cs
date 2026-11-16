@@ -1,8 +1,5 @@
 using Microsoft.Win32;
 using System.IO;
-using System.Windows.Markup;
-using System.Windows.Media.Effects;
-using MOProblemsReader.Logging;
 using Serilog;
 using Serilog.Events;
 
