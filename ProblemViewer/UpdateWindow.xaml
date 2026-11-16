@@ -14,5 +14,6 @@
 
         </Grid.RowDefinitions>
         <ProgressBar Name="UpdateProgressBar" Grid.Row="0"  IsIndeterminate="True" />
+        <Button Name="CancelButton" Content="取消" Grid.Row="2" Width="75" VerticalAlignment="Bottom" HorizontalAlignment="Right" Click="CancelButton_Click"/>
     </Grid>
 </Window>

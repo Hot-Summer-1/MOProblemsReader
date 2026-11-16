@@ -40,9 +40,14 @@ namespace ProblemViewer
             }
         }
         /// <summary>
+        /// 内置的默认题库仓库地址；用户把题源 URL 留空时回落到该值。
+        /// </summary>
+        public const string DefaultRepositoryURL = "https://github.com/Hot-Summer-1/MOProblems.git";
+
+        /// <summary>
         /// 题库仓库 URL 的后备字段，初值为内置的默认仓库。
         /// </summary>
-        private static string _repositoryURL = "https://github.com/Hot-Summer-1/MOProblems.git";
+        private static string _repositoryURL = DefaultRepositoryURL;
 
         /// <summary>
         /// 题库仓库在本地的工作副本目录（<c>%LOCALAPPDATA%\MOProblemsReader\MOProblems</c>），clone/pull 与题库读取都以它为根。
@@ -76,14 +81,16 @@ namespace ProblemViewer
             }
         }
         /// <summary>
-        /// 题库仓库的远端 URL（git 地址），由用户在题源设置窗口中修改。
+        /// 题库仓库的远端 URL（git 地址），由用户在题源设置窗口中修改；
+        /// 赋值为空（或全空白）时自动回落到 <see cref="DefaultRepositoryURL"/>。
         /// </summary>
         public static string RepositoryURL
         {
             get => _repositoryURL;
             set
             {
-                _repositoryURL = value;
+                // 空字符串会让 clone 直接失败，统一回落到内置默认仓库
+                _repositoryURL = string.IsNullOrWhiteSpace(value) ? DefaultRepositoryURL : value;
             }
         }
 

@@ -43,8 +43,49 @@
             <ColumnDefinition></ColumnDefinition>
 
         </Grid.ColumnDefinitions>
-        <TextBlock Text="题源URL:"  VerticalAlignment="Center" Grid.Row="0" Grid.Column="0"/>
-        <TextBox Name="RepositoryURLTextBox" Grid.Row="0"  Grid.Column="1" Grid.ColumnSpan="7" VerticalAlignment="Center"/>
+        <!-- 标签右侧留出空隙，避免与第一列最末尾的状态指示器贴在一起 -->
+        <TextBlock Text="题源URL:" VerticalAlignment="Center" Margin="0,0,18,0" Grid.Row="0" Grid.Column="0"/>
+        <TextBox Name="RepositoryURLTextBox"
+                 Grid.Row="0" Grid.Column="1" Grid.ColumnSpan="6"
+                 VerticalAlignment="Center"
+                 TextChanged="RepositoryURLTextBox_TextChanged"/>
+        <!--
+            检查状态指示器固定在「第一列（题源URL 标签列）的最末尾」，三个控件靠 Visibility 互斥显示。
+            转圈复用 MaterialDesign 的环形进度条样式（App.xaml 已合并该样式字典），
+            不要写成 materialDesign:CircularProgressBar —— 该标记在 5.2.1 中未导出。
+        -->
+        <ProgressBar Name="CheckProgressBar"
+                     Grid.Row="0" Grid.Column="0"
+                     IsIndeterminate="True"
+                     Style="{DynamicResource MaterialDesignCircularProgressBar}"
+                     Width="16" Height="16"
+                     HorizontalAlignment="Right"
+                     VerticalAlignment="Center"
+                     Margin="0,0,4,0"
+                     Foreground="{DynamicResource SystemAccentBrush}"
+                     Visibility="Collapsed"
+                     IsHitTestVisible="False"/>
+        <TextBlock Name="CheckOkTextBlock"
+                   Grid.Row="0" Grid.Column="0"
+                   Text="✓"
+                   FontWeight="Bold"
+                   Foreground="Green"
+                   HorizontalAlignment="Right"
+                   VerticalAlignment="Center"
+                   Margin="0,0,6,0"
+                   Visibility="Collapsed"
+                   IsHitTestVisible="False"/>
+        <TextBlock Name="CheckFailTextBlock"
+                   Grid.Row="0" Grid.Column="0"
+                   Text="✗"
+                   FontWeight="Bold"
+                   Foreground="Red"
+                   HorizontalAlignment="Right"
+                   VerticalAlignment="Center"
+                   Margin="0,0,6,0"
+                   Visibility="Collapsed"
+                   IsHitTestVisible="False"/>
+        <Button Content="检查" Grid.Row="0" Grid.Column="7" VerticalAlignment="Center" HorizontalAlignment="Center" Width="60" Click="CheckButton_OnClick"/>
         <Button Content="更新(_U)" Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Click="UpdateButton_Click"/>
         <CheckBox Name="AutoUpdateCheckBox" Content="启用自动更新"  Grid.Row="2" Grid.Column="2" Grid.ColumnSpan="2" VerticalAlignment="Center"/>
         <TextBlock Grid.Row="4" Grid.Column="0" Text="日志级别:"  VerticalAlignment="Center"/>
