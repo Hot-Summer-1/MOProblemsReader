@@ -139,6 +139,35 @@ namespace ProblemViewer
         }
 
         /// <summary>
+        /// 校验题源 URL 是否是能交给 libgit2 处理的绝对地址。
+        /// </summary>
+        /// <remarks>
+        /// libgit2 是 native 库，遇到非法 scheme（例如拼错的 htp://）可能在 native 层直接崩溃并抛出
+        /// ExecutionEngineException；该异常无法被托管代码捕获，进程会直接终止。
+        /// 因此必须在调用 Repository.Clone 之前用托管代码完成校验。
+        /// </remarks>
+        /// <param name="url">待校验的题源 URL，可能来自用户输入或已保存的设置。</param>
+        /// <exception cref="RepositoryUpdateException">URL 为空、不是绝对地址或协议不受支持时抛出。</exception>
+        private static void ValidateRepositoryUrl(string url)
+        {
+            if (string.IsNullOrWhiteSpace(url))
+            {
+                throw new RepositoryUpdateException("题源 URL 为空。");
+            }
+
+            if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
+            {
+                throw new RepositoryUpdateException($"题源 URL 不是合法的绝对地址：{url}");
+            }
+
+            // 只放行 libgit2 支持的传输协议，其余（含拼错的 htp）在进入 native 前拦下
+            if (uri.Scheme is not ("http" or "https" or "ssh" or "git" or "file"))
+            {
+                throw new RepositoryUpdateException($"不支持的题源 URL 协议：{uri.Scheme}");
+            }
+        }
+
+        /// <summary>
         /// 在临时目录克隆指定仓库，用于设置界面验证题源 URL 是否可用。
         /// </summary>
         /// <remarks>
@@ -148,6 +177,8 @@ namespace ProblemViewer
         /// <param name="url">待验证的 git 仓库地址。</param>
         public static void CheckRepository(string url)
         {
+            // 放在 try 之外：非法 URL 必须在进入 libgit2 native 调用前拦下，且异常不被包装
+            ValidateRepositoryUrl(url);
             var tempPath = GetTempPath(CheckRepositoryFolderName);
             DeleteDirectoryIfExists(tempPath);
             try
@@ -218,6 +249,8 @@ namespace ProblemViewer
         /// <exception cref="RepositoryUpdateException">克隆或覆盖本地仓库失败时抛出。</exception>
         private static UpdateOutcome ForceUpdate(CancellationToken cancellationToken)
         {
+            // 放在 try 之外：非法 URL 必须在进入 libgit2 native 调用前拦下，且不被下面的 catch 包装
+            ValidateRepositoryUrl(Settings.RepositoryURL);
             var tempPath = GetTempPath(TempRepositoryFolderName);
             try
             {

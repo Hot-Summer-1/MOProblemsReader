@@ -68,7 +68,7 @@ namespace ProblemViewer
             {
                 Outcome = UpdateOutcome.Failed;
                 Log.Error(ex,
-                    "Repository update failed. Local Repository Path: {LocalRepositoryPath}; RepositoryURL:{RepositoryURL}",
+                    "Repository update failed. Local Repository Path: {LocalRepositoryPath}; RepositoryURL: {RepositoryURL}",
                     Settings.LocalRepositoryPath, Settings.RepositoryURL);
 
                 // 本地仓库无法还原到更新前状态时必须通知界面按失败处理，否则界面会继续展示与实际磁盘不一致的题库
