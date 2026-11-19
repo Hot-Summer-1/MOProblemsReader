@@ -4,8 +4,10 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:MOProblemsReader"
+        xmlns:vm="clr-namespace:MOProblemsReader.ViewModels"
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
         mc:Ignorable="d"
+        d:DataContext="{d:DesignInstance Type=vm:MainWindowViewModel, IsDesignTimeCreatable=False}"
         Title="数学竞赛问题集" Height="450" Width="800" Loaded="Window_Loaded" Closed="Window_Closed">
     <!--
         Ctrl+U 快捷键：InputGestureText 只负责在菜单右侧显示提示文字，不产生任何键盘绑定；
@@ -20,25 +22,38 @@
     </Window.InputBindings>
     <Window.Resources>
         <!--
-            加载中占位模板：用原生 ProgressBar 套 MaterialDesign 的环形样式（MaterialDesignCircularProgressBar）。
-            不要写成 materialDesign:CircularProgressBar —— 该标记在 MaterialDesignThemes 5.2.1 的 XAML 命名空间
-            中并未导出，会报 MC3074 编译错误。
-            样式键用 DynamicResource：键缺失时只退化为默认外观，不会像 StaticResource 那样在运行时抛异常。
-            前景色绑定应用资源 SystemAccentBrush：它由 App 启动时从注册表 HKCU\...\DWM\AccentColor 读取，
-            并在系统改强调色或切换浅色/深色时运行时刷新。系统强调色只存在于注册表，
-            不能用 SystemColors.HighlightBrushKey —— 那是固定值（#FF0078D7），不跟随用户强调色。
-            Header 必须是非 null 值（占位项的 Header="Loading"），否则 ContentPresenter 不会套用本模板。
+            题库树节点模板：分类 → 赛事 → 年份三级共用一份模板，节点差异只体现在数据上。
+            转圈用原生 ProgressBar 套 MaterialDesign 的环形样式（MaterialDesignCircularProgressBar），
+            不要写成 materialDesign:CircularProgressBar —— 该标记在 MaterialDesignThemes 5.2.1 的
+            XAML 命名空间中并未导出，会报 MC3074 编译错误。
+            BasedOn 必须是 StaticResource：Style.BasedOn 是 CLR 属性，不支持 DynamicResource。
+            转圈与文字在同一行渲染，不产生子级缩进，因此不需要负 Margin 抵消层级缩进；
+            前景色绑定应用资源 SystemAccentBrush，它由 App 启动时从注册表
+            HKCU\...\DWM\AccentColor 读取并在系统改强调色时刷新，
+            不能用 SystemColors.HighlightBrushKey —— 那是固定值，不跟随用户强调色。
         -->
-        <DataTemplate x:Key="LoadingIndicatorTemplate">
-            <!-- 负 Margin 抵消 TreeViewItem 子项自带的层级缩进，让转圈靠左贴近父节点文字 -->
-            <ProgressBar IsIndeterminate="True"
-                         Style="{DynamicResource MaterialDesignCircularProgressBar}"
-                         Width="18"
-                         Height="18"
-                         Margin="-16,0,0,0"
-                         HorizontalAlignment="Left"
-                         Foreground="{DynamicResource SystemAccentBrush}" />
-        </DataTemplate>
+        <HierarchicalDataTemplate DataType="{x:Type vm:ProblemNodeViewModel}" ItemsSource="{Binding Children}">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="{Binding DisplayName}" VerticalAlignment="Center"/>
+                <ProgressBar Width="16" Height="16"
+                             Margin="6,0,0,0"
+                             VerticalAlignment="Center"
+                             IsIndeterminate="True"
+                             Foreground="{DynamicResource SystemAccentBrush}">
+                    <ProgressBar.Style>
+                        <Style TargetType="ProgressBar" BasedOn="{StaticResource MaterialDesignCircularProgressBar}">
+                            <!-- 默认不占位：未加载时由 Setter 折叠，加载中才由触发器显示 -->
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsLoading}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ProgressBar.Style>
+                </ProgressBar>
+            </StackPanel>
+        </HierarchicalDataTemplate>
     </Window.Resources>
 
     <DockPanel>
@@ -57,42 +72,29 @@
 
         <!-- 主体内容区域 -->
         <Grid>
-            <!-- Expanded 是冒泡路由事件，在 TreeView 上挂接一次即可覆盖所有层级的节点 -->
-            <TreeView Name="ProblemTreeView" TreeViewItem.Expanded="ProblemTreeView_ItemExpanded">
-                <TreeView.Resources>
-                    <Style TargetType="{x:Type TreeViewItem}" BasedOn="{StaticResource {x:Type TreeViewItem}}">
-                        <EventSetter Event="MouseDoubleClick" Handler="TreeViewItem_MouseDoubleClick"/>
+            <!--
+                树的数据来自 ViewModel 的 Categories：展开状态双向绑定到节点的 IsExpanded，
+                由节点自身在展开时触发懒加载；可用性绑定 IsEnabled 以支持仓库更新失败后的禁用。
+                ItemContainerStyle 必须 BasedOn 默认容器样式，否则会丢掉主题为 TreeViewItem 注入的外观。
+            -->
+            <TreeView Name="ProblemTreeView"
+                      ItemsSource="{Binding Categories}"
+                      MouseDoubleClick="ProblemTreeView_MouseDoubleClick">
+                <TreeView.ItemContainerStyle>
+                    <Style TargetType="TreeViewItem" BasedOn="{StaticResource {x:Type TreeViewItem}}">
+                        <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
+                        <Setter Property="IsEnabled" Value="{Binding IsEnabled}"/>
+                        <Style.Triggers>
+                            <!--
+                                占位子项只用于让父节点保持 HasItems=true 以显示展开箭头，
+                                容器折叠后不渲染空行；Collapsed 的容器仍计入 Items，箭头照常显示。
+                            -->
+                            <DataTrigger Binding="{Binding Kind}" Value="{x:Static vm:ProblemNodeKind.Placeholder}">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                            </DataTrigger>
+                        </Style.Triggers>
                     </Style>
-                </TreeView.Resources>
-                <TreeViewItem Header="国内" Name="china">
-                    <!-- 占位子项：使节点在折叠态就渲染展开箭头，展开后显示转圈，由代码按 Tag 回收 -->
-                    <TreeViewItem Header="Loading"
-                                  HeaderTemplate="{StaticResource LoadingIndicatorTemplate}"
-                                  Tag="LoadingPlaceholder"
-                                  IsHitTestVisible="False"
-                                  Focusable="False" />
-                </TreeViewItem>
-                <TreeViewItem Header="国外" Name="abroad">
-                    <TreeViewItem Header="Loading"
-                                  HeaderTemplate="{StaticResource LoadingIndicatorTemplate}"
-                                  Tag="LoadingPlaceholder"
-                                  IsHitTestVisible="False"
-                                  Focusable="False" />
-                </TreeViewItem>
-                <TreeViewItem Header="大学" Name="university">
-                    <TreeViewItem Header="Loading"
-                                  HeaderTemplate="{StaticResource LoadingIndicatorTemplate}"
-                                  Tag="LoadingPlaceholder"
-                                  IsHitTestVisible="False"
-                                  Focusable="False" />
-                </TreeViewItem>
-                <TreeViewItem Header="原创" Name="original">
-                    <TreeViewItem Header="Loading"
-                                  HeaderTemplate="{StaticResource LoadingIndicatorTemplate}"
-                                  Tag="LoadingPlaceholder"
-                                  IsHitTestVisible="False"
-                                  Focusable="False" />
-                </TreeViewItem>
+                </TreeView.ItemContainerStyle>
             </TreeView>
         </Grid>
     </DockPanel>

@@ -1,42 +1,19 @@
-﻿using ProblemViewer;
-using Serilog;
-using System.IO;
-using System.Text.Json;
+﻿using MOProblemsReader.ViewModels;
+using ProblemViewer;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
-using Path = System.IO.Path;
 
 namespace MOProblemsReader
 {
 
     /// <summary>
-    /// 主窗口：以「分类 → 赛事 → 年份」的树形结构浏览题库，并承载更新、题源设置等菜单命令。
+    /// 主窗口：题库树的数据、加载与刷新由 <see cref="MainWindowViewModel"/> 负责，
+    /// 这里只保留命令、菜单与窗口级事件接线。
     /// </summary>
     public partial class MainWindow : Window
     {
-        /// <summary>
-        /// 记录各分类根节点是否已被真实数据填充（键为节点 <c>Name</c>）。为 <c>true</c> 表示已加载过，
-        /// 再次展开时无需重新读取数据；仓库更新后置回 <c>false</c> 以便重新加载。
-        /// </summary>
-        private Dictionary<string, bool> loaddict = new()
-        {
-            ["china"] = false,
-            ["abroad"] = false,
-            ["university"] = false,
-            ["original"] = false
-        };
-        /// <summary>
-        /// 「加载中」占位子项的标记值，必须与 MainWindow.xaml 中占位项的 Tag 字面量保持一致。
-        /// </summary>
-        private const string LoadingPlaceholderTag = "LoadingPlaceholder";
-
-        /// <summary>
-        /// 「加载中」占位模板的资源键，定义在 MainWindow.xaml 的 Window.Resources 中。
-        /// </summary>
-        private const string LoadingIndicatorTemplateKey = "LoadingIndicatorTemplate";
-
         /// <summary>
         /// 「更新」命令，供菜单项与 Ctrl+U 快捷键共用同一执行入口。
         /// </summary>
@@ -48,13 +25,22 @@ namespace MOProblemsReader
             new("更新", nameof(UpdateCommand), typeof(MainWindow));
 
         /// <summary>
-        /// 创建主窗口，并把退出模式恢复为「关闭最后一个窗口即退出」。
+        /// 题库树视图模型，窗口级唯一实例；树的节点集合与状态全部由它持有。
+        /// </summary>
+        private readonly MainWindowViewModel _viewModel;
+
+        /// <summary>
+        /// 创建主窗口：装配视图模型并把退出模式恢复为「关闭最后一个窗口即退出」。
         /// </summary>
         public MainWindow()
         {
             // 启动强制更新时退出模式被临时改为 OnExplicitShutdown，主窗口出现后必须改回，否则关窗不会退出
             Application.Current.ShutdownMode = ShutdownMode.OnLastWindowClose;
             InitializeComponent();
+
+            // 视图负责提供数据来源与提示出口，使视图模型不直接依赖 WPF
+            _viewModel = new MainWindowViewModel(new ProblemTreeLoader(), new MessageBoxUserNotifier(this));
+            DataContext = _viewModel;
         }
 
         private void ExitMenuItem_Click(object sender, RoutedEventArgs e)
@@ -63,63 +49,13 @@ namespace MOProblemsReader
         }
 
         /// <summary>
-        /// 仓库更新完成的回调：成功则重置各分类节点以便重新加载，失败则禁用尚未加载的节点。
+        /// 仓库更新完成的回调：交给视图模型决定分类节点的可用性与是否需要重新加载。
         /// </summary>
         /// <param name="sender">事件源（<see cref="RepositoryManager"/>），此处不使用。</param>
         /// <param name="e">事件参数，其 <c>Success</c> 表示更新是否成功。</param>
-        private void RepositoryManager_RepositoryUpdated(object? sender, RepositoryUpdatedEventArgs e)
-        {
-            if (e.Success)
-            {
-                Log.Information("Repository updated. Reload the nodes.");
-                china.IsEnabled = true;
-                abroad.IsEnabled = true;
-                university.IsEnabled = true;
-                original.IsEnabled = true;
-                RefreshNode(china);
-                RefreshNode(abroad);
-                RefreshNode(university);
-                RefreshNode(original);
-            }
-            else
-            {
-                Log.Warning("Repository update failed. Now disable the unloaded nodes.");
-                ProtectNode(china);
-                ProtectNode(abroad);
-                ProtectNode(university);
-                ProtectNode(original);
-            }
-        }
+        private async void RepositoryManager_RepositoryUpdated(object? sender, RepositoryUpdatedEventArgs e)
+            => await _viewModel.OnRepositoryUpdatedAsync(e.Success);
 
-        /// <summary>
-        /// 更新失败时禁用尚未加载过的节点，避免用户展开到不存在的题库数据。
-        /// </summary>
-        /// <param name="node">待处理的分类根节点。</param>
-        private void ProtectNode(TreeViewItem node)
-        {
-            if (!loaddict[node.Name])
-            {
-                node.IsExpanded = false;
-                node.IsEnabled = false;
-            }
-        }
-        /// <summary>
-        /// 更新成功后重置已加载过的节点：重新挂上「加载中」占位；若节点正展开着则立刻重新加载。
-        /// </summary>
-        /// <param name="node">待重置的分类根节点。</param>
-        private void RefreshNode(TreeViewItem node)
-        {
-            if (loaddict[node.Name])
-            {
-                node.ItemsSource = new List<TreeViewItem> { CreateLoadingPlaceholder() };
-                loaddict[node.Name] = false;
-                if (node.IsExpanded)
-                {
-                    UpdateNode(node);
-                }
-            }
-
-        }
         /// <summary>
         /// 打开"关于"对话框。
         /// </summary>
@@ -152,183 +88,7 @@ namespace MOProblemsReader
         }
 
         /// <summary>
-        /// 树节点展开时的统一入口：回收「加载中」占位子项，并触发该节点的子节点加载。
-        /// </summary>
-        /// <param name="sender">事件源。由于挂接在 TreeView 上，此处通常是 TreeView 而非被展开的节点。</param>
-        /// <param name="e">路由事件参数，其中 OriginalSource 才是真正被展开的 TreeViewItem。</param>
-        private void ProblemTreeView_ItemExpanded(object sender, RoutedEventArgs e)
-        {
-            // Expanded 是冒泡路由事件：任意深度节点展开都会冒泡到 TreeView，
-            // 因此必须用 OriginalSource 定位真正展开的节点，不能直接强转 sender。
-            if (e.OriginalSource is not TreeViewItem node)
-            {
-                return;
-            }
-
-            if (ItemsControl.ItemsControlFromItemContainer(node) is not TreeView)
-            {
-                return;
-            }
-            // 只有仍处于「占位状态」的节点才需要走首次加载；
-            // 已填充真实数据的节点再次展开时不应重复请求，避免反复加载。
-            if (!HasLoadingPlaceholder(node))
-            {
-                return;
-            }
-            UpdateNode(node);
-        }
-
-        /// <summary>
-        /// 同步读取指定分类下每个赛事目录的 <c>info.json</c> 并构造赛事信息列表（在后台线程调用）。
-        /// </summary>
-        /// <param name="nodeName">分类目录名，必须是 china / abroad / university / original 之一。</param>
-        /// <returns>读取成功的赛事信息集合；单个赛事读取失败只记日志并跳过，不影响其它赛事。</returns>
-        /// <exception cref="ArgumentException"><paramref name="nodeName"/> 不是已知分类名。</exception>
-        private List<CompetitionInfo> LoadChildrenAsync(string nodeName)
-        {
-            // TODO: 目前只加载到「赛事 → 年份」，双击年份打开题目内容的流程尚未接入。
-            string CompetitonPath = Path.Combine(Settings.LocalRepositoryPath, "problems");
-            switch (nodeName)
-            {
-                case "china":
-                case "abroad":
-                case "university":
-                case "original":
-                    CompetitonPath = Path.Combine(CompetitonPath, nodeName);
-                    break;
-                default:
-                    throw new ArgumentException($"Invalid node name: {nodeName}.");
-            }
-
-            var compInfoItems = new List<CompetitionInfo>();
-            foreach (string dir in Directory.EnumerateDirectories(CompetitonPath))
-            {
-                try
-                {
-                    string name = new DirectoryInfo(dir).Name, infofile = Path.Combine(dir, "info.json");
-                    string jsonInfoString = File.ReadAllText(infofile);
-                    CompetitionInfo compinfo = JsonSerializer.Deserialize<CompetitionInfo>(jsonInfoString)!;
-                    compinfo.name = name;
-                    compInfoItems.Add(compinfo);
-                }
-                catch (Exception ex)
-                {
-                    Log.Warning(ex, "Load competition {name} failed.", Path.GetFileName(dir.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)));
-                }
-            }
-            return compInfoItems;
-        }
-
-        /// <summary>
-        /// 异步加载分类节点下的赛事与年份子项；失败时禁用该节点并要求下次启动强制更新，避免继续使用损坏的题库数据。
-        /// </summary>
-        /// <param name="node">需要加载子节点的分类根节点。</param>
-        private async void UpdateNode(TreeViewItem node)
-        {
-            var nodeName = node.Name;
-            Log.Debug("Begin to load competitions under node {nodeName}.", nodeName);
-            try
-            {
-                var item = await Task.Run(() => LoadChildrenAsync(nodeName));
-                var nodeitemlist = new List<TreeViewItem>();
-                foreach (CompetitionInfo comp in item)
-                {
-                    var comptreeviewitem = new TreeViewItem
-                    {
-                        Name = comp.name,
-                        Header = comp.display_name,
-                        Tag="comp"
-                    };
-                    var yearlist = new List<TreeViewItem>();
-                    foreach (YearInfo year in comp.years)
-                    {
-                        var yeartreeviewitem = new TreeViewItem
-                        {
-                            Header = year.name,
-                            Tag="year"
-                        };
-                        yearlist.Add(yeartreeviewitem);
-                    }
-                    comptreeviewitem.ItemsSource = yearlist;
-                    nodeitemlist.Add(comptreeviewitem);
-                }
-                RemoveLoadingPlaceholder(node);
-                node.ItemsSource = nodeitemlist;
-                loaddict[nodeName] = true;
-            }
-            catch (Exception ex)
-            {
-                // 记录节点名，便于根据日志定位是哪个分类的题库数据损坏
-                Log.Error(ex, "Failed to load competitions under node {NodeName}.", nodeName);
-                MessageBox.Show(this, $"加载竞赛条目时遇到错误: {ex.Message}", "竞赛条目加载错误", MessageBoxButton.OK,
-                    MessageBoxImage.Error);
-                node.IsExpanded = false;
-                node.IsEnabled = false;
-                Settings.ForceUpdateRequired = true;
-            }
-            Log.Debug("Finish loading competitions under node {nodeName}.", nodeName);
-        }
-        /// <summary>
-        /// 判断指定节点下是否还存在「加载中」占位子项。
-        /// </summary>
-        /// <param name="node">待检查的树节点。</param>
-        /// <returns>存在占位子项返回 <c>true</c>，否则返回 <c>false</c>。</returns>
-        private static bool HasLoadingPlaceholder(TreeViewItem node)
-        {
-            foreach (object item in node.Items)
-            {
-                if (item is TreeViewItem treeItem && LoadingPlaceholderTag.Equals(treeItem.Tag))
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        /// <summary>
-        /// 移除指定节点下所有「加载中」占位子项，保留真实数据项。
-        /// </summary>
-        /// <param name="node">待清理的树节点。</param>
-        private static void RemoveLoadingPlaceholder(TreeViewItem node)
-        {
-            // 按 Tag 识别而不是按下标删除：节点一旦填充真实数据，
-            // 占位项的位置就不再固定，按下标会误删真实数据项。
-            // 倒序遍历可避免边删边改集合导致索引错位。
-            if (node.ItemsSource != null) return;
-            for (int i = node.Items.Count - 1; i >= 0; i--)
-            {
-                if (node.Items[i] is TreeViewItem treeItem && LoadingPlaceholderTag.Equals(treeItem.Tag))
-                {
-                    node.Items.RemoveAt(i);
-                }
-            }
-        }
-
-
-        /// <summary>
-        /// 以代码方式创建一个复用 XAML 模板的「加载中」占位子项。
-        /// </summary>
-        /// <returns>已配置模板与标记的占位 <see cref="TreeViewItem"/>。</returns>
-        private static TreeViewItem CreateLoadingPlaceholder()
-        {
-            var placeholder = new TreeViewItem
-            {
-                // Header 必须是非 null 值，否则 ContentPresenter 不会套用 HeaderTemplate；
-                // 实际显示被模板完全覆盖，用户看不到这个占位文本。
-                Header = "Loading",
-                Tag = LoadingPlaceholderTag,
-                IsHitTestVisible = false,
-                Focusable = false
-            };
-
-            // 用资源引用而非直接塞模板实例，样式改动只需改 XAML 一处。
-            placeholder.SetResourceReference(HeaderedItemsControl.HeaderTemplateProperty, LoadingIndicatorTemplateKey);
-            return placeholder;
-        }
-
-        /// <summary>
-        /// 窗口加载时订阅仓库更新完成事件。
+        /// 窗口加载时订阅仓库更新事件，使题库树能随更新结果刷新或禁用。
         /// </summary>
         /// <param name="sender">事件源，此处不使用。</param>
         /// <param name="e">事件参数，此处不使用。</param>
@@ -348,23 +108,54 @@ namespace MOProblemsReader
         }
 
         /// <summary>
-        /// 双击年份节点的占位实现：目前只弹出该年份所属的赛事与分类，真实题目内容视图待接入。
+        /// 双击年份节点时的入口：目前仅以提示框呈现「年份-赛事-分类」定位信息，
+        /// 真实题目内容视图尚未接入（保留原有 TODO）。
         /// </summary>
-        /// <param name="sender">被双击的树节点。</param>
-        /// <param name="e">鼠标事件参数，其 <c>OriginalSource</c> 用于判断双击是否落在该节点自身而非子项上。</param>
-        private void TreeViewItem_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+        /// <param name="sender">事件源，此处不使用。</param>
+        /// <param name="e">鼠标事件参数，其 <c>OriginalSource</c> 用于定位被双击的树节点。</param>
+        private void ProblemTreeView_MouseDoubleClick(object sender, MouseButtonEventArgs e)
         {
-            var senderItem = (TreeViewItem)sender;
-            var source = e.OriginalSource as DependencyObject;
-            while (source != null && !(source is TreeViewItem))
-                source = VisualTreeHelper.GetParent(source);
-            if (source == senderItem)
+            if (!TryFindAncestor<TreeViewItem>(e.OriginalSource as DependencyObject, out var item))
             {
-                if (senderItem.Tag is not string tag||tag != "year") return; 
-                var compItem = (TreeViewItem)ItemsControl.ItemsControlFromItemContainer(senderItem);
-                var categoryItem = (TreeViewItem)ItemsControl.ItemsControlFromItemContainer(compItem);
-                MessageBox.Show($"点击了{senderItem.Header}-{compItem.Header}({compItem.Name})-{categoryItem.Header}");
+                return;
             }
+
+            // 模板渲染下 TreeViewItem 的 DataContext 就是对应的节点视图模型
+            if (item.DataContext is not ProblemNodeViewModel { Kind: ProblemNodeKind.Year } node)
+            {
+                return;
+            }
+
+            // 文案与重构前保持一致：年份 - 赛事 - 分类
+            MessageBox.Show(
+                $"{node.DisplayName}\n{node.Parent?.DisplayName}\n{node.Parent?.Parent?.DisplayName}",
+                "题目",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
+
+        /// <summary>
+        /// 从命中的可视元素向上查找指定类型的祖先容器。
+        /// </summary>
+        /// <typeparam name="T">要查找的容器类型。</typeparam>
+        /// <param name="source">事件命中的原始可视元素，可为 <c>null</c>。</param>
+        /// <param name="result">找到的祖先容器；未找到时为 <c>null</c>。</param>
+        /// <returns>找到指定类型的祖先容器时为 <c>true</c>。</returns>
+        private static bool TryFindAncestor<T>(DependencyObject? source, out T result) where T : DependencyObject
+        {
+            while (source is not null)
+            {
+                if (source is T match)
+                {
+                    result = match;
+                    return true;
+                }
+
+                source = VisualTreeHelper.GetParent(source);
+            }
+
+            result = null!;
+            return false;
         }
     }
 }
